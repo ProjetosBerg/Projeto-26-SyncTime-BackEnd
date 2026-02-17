@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDirs": ["./src", "./tests"],
     "removeComments": true,
     "strict": true,
     "typeRoots": ["./types/", "./node_modules/@types/"],
@@ -22,5 +22,5 @@
     },
     "noImplicitAny": false
   },
-  "include": ["src", "tests", "types"]
+  "include": ["src", "tests", "types", "server.ts"]
 }
