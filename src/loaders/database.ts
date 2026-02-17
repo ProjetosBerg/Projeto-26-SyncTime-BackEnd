@@ -5,6 +5,7 @@ import postgresDbConfig from "@/config/postgres";
 import mongoDbConfig from "@/config/mongodb";
 import logger from "@/loaders/logger";
 import PostgresEntities from "@/domain/entities/postgres";
+import path from "path";
 
 class DatabaseHelper {
   private typeOrmConnections: Connection[];
@@ -25,7 +26,12 @@ class DatabaseHelper {
       const postgresConnection = await createConnection({
         ...this.postgresDbConfig,
         entities: [...Object.values(PostgresEntities || {})],
-        migrations: ["src/migrations/**/*.ts"],
+        migrations: [
+          process.env.NODE_ENV === "production"
+            ? path.join(__dirname, "../migrations/**/*.js")
+            : path.join(__dirname, "../migrations/**/*.ts"),
+        ],
+
         logging: false,
         maxQueryExecutionTime: 1000,
         name: "default",
