@@ -4,13 +4,13 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import env from "env-var";
-import router from "./src/routes";
+import router from "./routes";
 import databaseHelper from "@/loaders/database";
 import logger from "@/loaders/logger";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "@/config/swagger";
 import cors from "cors";
-import { initSocket, getIoInstance } from "./src/lib/socket";
+import { initSocket, getIoInstance } from "./lib/socket";
 
 const app = express();
 const server = http.createServer(app);

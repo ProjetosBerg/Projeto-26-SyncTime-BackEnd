@@ -22,5 +22,5 @@
     },
     "noImplicitAny": false
   },
-  "include": ["src", "tests", "types", "server.ts"]
+  "include": ["src", "tests", "types", "src/server.ts"]
 }
