@@ -50,6 +50,36 @@ export class RoutinesRepository implements RoutinesRepositoryProtocol {
   }
 
   /**
+   * Cria várias rotinas em uma única transação.
+   */
+  async createMany(
+    data: RoutinesRepositoryProtocol.CreateRoutine[]
+  ): Promise<RoutineModel[]> {
+    const routines = this.repository.create(
+      data.map((item) => ({
+        type: item.type,
+        period: item.period,
+        user: { id: item.userId } as User,
+        created_at: item.createdAt || new Date(),
+        updated_at: new Date(),
+      }))
+    );
+
+    const savedRoutines = await this.repository.save(routines, {
+      transaction: true,
+    });
+
+    return savedRoutines.map((routine) => ({
+      id: routine.id,
+      type: routine.type,
+      period: routine.period,
+      user_id: routine.user.id,
+      created_at: routine.created_at,
+      updated_at: routine.updated_at,
+    }));
+  }
+
+  /**
    * Busca uma rotina por tipo, período e ID do usuário (excluindo ID opcional)
    * @param {RoutinesRepositoryProtocol.FindByTypeAndPeriodAndUserIdParams} data - Os dados para busca
    * @param {string} data.type - Tipo da rotina

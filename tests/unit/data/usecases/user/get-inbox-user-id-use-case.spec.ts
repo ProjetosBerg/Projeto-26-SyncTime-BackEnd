@@ -58,6 +58,7 @@ const makeRoutinesRepository = (): jest.Mocked<RoutinesRepositoryProtocol> => ({
     total: 1,
   }),
   create: jest.fn(),
+  createMany: jest.fn(),
   findByTypeAndPeriodAndUserId: jest.fn(),
   findByPeriodAndUserIdAndDateRange: jest.fn(),
   findByIdAndUserId: jest.fn(),

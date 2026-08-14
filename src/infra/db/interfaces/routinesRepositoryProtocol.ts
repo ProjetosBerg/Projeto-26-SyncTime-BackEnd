@@ -2,6 +2,9 @@ import { RoutineModel, Period } from "@/domain/models/postgres/RoutinModel";
 
 export interface RoutinesRepositoryProtocol {
   create(data: RoutinesRepositoryProtocol.CreateRoutine): Promise<RoutineModel>;
+  createMany(
+    data: RoutinesRepositoryProtocol.CreateRoutine[]
+  ): Promise<RoutineModel[]>;
   findByTypeAndPeriodAndUserId(
     data: RoutinesRepositoryProtocol.FindByTypeAndPeriodAndUserIdParams
   ): Promise<RoutineModel | null>;

@@ -27,7 +27,7 @@ export class CreateRoutinesUseCase implements CreateRoutinesUseCaseProtocol {
 
   async handle(
     data: CreateRoutinesUseCaseProtocol.Params
-  ): Promise<RoutineModel> {
+  ): Promise<RoutineModel | RoutineModel[]> {
     try {
       await createRoutinesValidationSchema.validate(data, {
         abortEarly: false,
@@ -39,35 +39,50 @@ export class CreateRoutinesUseCase implements CreateRoutinesUseCaseProtocol {
       const endDate = new Date(intendedDate);
       endDate.setHours(23, 59, 59, 999);
 
-      const existingRoutine =
-        await this.routinesRepository.findByTypeAndPeriodAndUserId({
-          type: data.type,
-          period: data.period,
-          userId: data.userId,
-          startDate,
-          endDate,
-        });
+      const periods = data.periods?.length ? data.periods : [data.period];
 
-      if (existingRoutine) {
-        throw new BusinessRuleError(
-          `Já existe uma rotina com o tipo "${data.type}"${data.period ? ` e período "${data.period}"` : " sem período"} para este usuário`
-        );
-      }
-
-      if (data.period) {
-        const existingTodayRoutine =
-          await this.routinesRepository.findByPeriodAndUserIdAndDateRange({
-            period: data.period,
+      for (const period of periods) {
+        const existingRoutine =
+          await this.routinesRepository.findByTypeAndPeriodAndUserId({
+            type: data.type,
+            period,
             userId: data.userId,
             startDate,
             endDate,
           });
 
-        if (existingTodayRoutine) {
+        if (existingRoutine) {
           throw new BusinessRuleError(
-            `Já existe uma rotina para o período "${data.period}" neste dia para este usuário`
+            `Já existe uma rotina com o tipo "${data.type}"${period ? ` e período "${period}"` : " sem período"} para este usuário`
           );
         }
+
+        if (period) {
+          const existingTodayRoutine =
+            await this.routinesRepository.findByPeriodAndUserIdAndDateRange({
+              period,
+              userId: data.userId,
+              startDate,
+              endDate,
+            });
+
+          if (existingTodayRoutine) {
+            throw new BusinessRuleError(
+              `Já existe uma rotina para o período "${period}" neste dia para este usuário`
+            );
+          }
+        }
+      }
+
+      if (data.periods?.length) {
+        return this.routinesRepository.createMany(
+          data.periods.map((period) => ({
+            type: data.type,
+            period,
+            userId: data.userId,
+            createdAt: data.createdAt,
+          }))
+        );
       }
 
       const createdRoutine = await this.routinesRepository.create({

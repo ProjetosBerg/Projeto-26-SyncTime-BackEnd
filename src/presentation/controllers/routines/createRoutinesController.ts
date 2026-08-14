@@ -14,11 +14,12 @@ export class CreateRoutinesController implements Controller {
     res: Response<IResponse>
   ): Promise<Response<IResponse>> {
     try {
-      const { type, period, createdAt } = req.body;
+      const { type, period, periods, createdAt } = req.body;
 
       const data = {
         type,
         period,
+        periods,
         createdAt,
       };
 
@@ -29,7 +30,9 @@ export class CreateRoutinesController implements Controller {
       return res.status(201).json({
         status: ResponseStatus.OK,
         data: createRoutine,
-        message: "Rotina criada com sucesso",
+        message: Array.isArray(createRoutine)
+          ? "Rotinas criadas com sucesso"
+          : "Rotina criada com sucesso",
       });
     } catch (error) {
       if (error instanceof ValidationError) {

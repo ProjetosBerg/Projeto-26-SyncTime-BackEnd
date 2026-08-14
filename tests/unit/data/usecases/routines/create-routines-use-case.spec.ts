@@ -8,6 +8,7 @@ import { mockRoutine } from "@/tests/unit/mocks/routines/mockRoutines";
 export const makeRoutinesRepository =
   (): jest.Mocked<RoutinesRepositoryProtocol> => ({
     create: jest.fn().mockResolvedValue(mockRoutine),
+    createMany: jest.fn().mockResolvedValue([mockRoutine]),
     findByTypeAndPeriodAndUserId: jest.fn().mockResolvedValue(null),
     findByPeriodAndUserIdAndDateRange: jest.fn().mockResolvedValue(null),
     ...({} as any),
@@ -71,6 +72,94 @@ describe("CreateRoutinesUseCase", () => {
     ).toHaveBeenCalledTimes(1);
     expect(routinesRepositorySpy.create).toHaveBeenCalledWith(input);
     expect(routinesRepositorySpy.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("should create multiple routines in a single repository operation", async () => {
+    const { sut, routinesRepositorySpy } = makeSut();
+    const periods = ["Manhã", "Tarde", "Noite"] as const;
+    const createdRoutines = periods.map((period, index) => ({
+      ...mockRoutine,
+      id: `routine-${index + 1}`,
+      period,
+    }));
+    routinesRepositorySpy.createMany.mockResolvedValue(createdRoutines);
+
+    const input = {
+      type: "periodo",
+      periods: [...periods],
+      userId: mockRoutine.user_id,
+      createdAt: mockRoutine.created_at,
+    };
+
+    const result = await sut.handle(input);
+
+    expect(result).toEqual(createdRoutines);
+    expect(
+      routinesRepositorySpy.findByTypeAndPeriodAndUserId
+    ).toHaveBeenCalledTimes(3);
+    expect(
+      routinesRepositorySpy.findByPeriodAndUserIdAndDateRange
+    ).toHaveBeenCalledTimes(3);
+    expect(routinesRepositorySpy.createMany).toHaveBeenCalledWith(
+      periods.map((period) => ({
+        type: input.type,
+        period,
+        userId: input.userId,
+        createdAt: input.createdAt,
+      }))
+    );
+    expect(routinesRepositorySpy.createMany).toHaveBeenCalledTimes(1);
+    expect(routinesRepositorySpy.create).not.toHaveBeenCalled();
+  });
+
+  test("should reject repeated periods before creating routines", async () => {
+    const { sut, routinesRepositorySpy } = makeSut();
+    const input = {
+      type: "periodo",
+      periods: ["Manhã", "Manhã"] as any,
+      userId: mockRoutine.user_id,
+    };
+
+    await expect(sut.handle(input)).rejects.toMatchObject({
+      errors: expect.arrayContaining(["Não é permitido repetir períodos"]),
+    });
+    expect(
+      routinesRepositorySpy.findByTypeAndPeriodAndUserId
+    ).not.toHaveBeenCalled();
+    expect(routinesRepositorySpy.createMany).not.toHaveBeenCalled();
+  });
+
+  test("should require a period for period routines", async () => {
+    const { sut, routinesRepositorySpy } = makeSut();
+    const input = {
+      type: "periodo",
+      userId: mockRoutine.user_id,
+    };
+
+    await expect(sut.handle(input)).rejects.toMatchObject({
+      errors: expect.arrayContaining(["Selecione pelo menos um período"]),
+    });
+    expect(
+      routinesRepositorySpy.findByTypeAndPeriodAndUserId
+    ).not.toHaveBeenCalled();
+    expect(routinesRepositorySpy.createMany).not.toHaveBeenCalled();
+  });
+
+  test("should not create any routine when one selected period already exists", async () => {
+    const { sut, routinesRepositorySpy } = makeSut();
+    routinesRepositorySpy.findByTypeAndPeriodAndUserId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(mockRoutine);
+
+    const input = {
+      type: "periodo",
+      periods: ["Manhã", "Tarde"] as ("Manhã" | "Tarde")[],
+      userId: mockRoutine.user_id,
+    };
+
+    await expect(sut.handle(input)).rejects.toThrow(BusinessRuleError);
+    expect(routinesRepositorySpy.createMany).not.toHaveBeenCalled();
+    expect(routinesRepositorySpy.create).not.toHaveBeenCalled();
   });
 
   test("should create a routine successfully without period", async () => {
