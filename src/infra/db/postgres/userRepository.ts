@@ -1,12 +1,56 @@
 import { UserModel } from "@/domain/models/postgres/UserModel";
 import { User } from "@/domain/entities/postgres/User";
 import { SecurityQuestion } from "@/domain/entities/postgres/SecurityQuestion";
-import { getRepository } from "typeorm";
+import { Authentication } from "@/domain/entities/postgres/Authentication";
+import { getManager, getRepository } from "typeorm";
 import { UserRepositoryProtocol } from "../interfaces/userRepositoryProtocol";
 import { NotFoundError } from "@/data/errors/NotFoundError";
 
 export class UserRepository implements UserRepositoryProtocol {
   constructor() {}
+
+  async updatePasswordAndInvalidateSessions(
+    data: UserRepositoryProtocol.UpdatePasswordAndInvalidateSessionsParams
+  ): Promise<UserModel | undefined> {
+    try {
+      return await getManager().transaction(async (manager) => {
+        const user = await manager.findOne(User, {
+          where: { id: data.id },
+        });
+        if (!user) {
+          throw new NotFoundError("Usuário não encontrado");
+        }
+
+        const now = new Date();
+        user.password = data.password;
+        user.updated_at = now;
+        const updatedUser = await manager.save(User, user);
+
+        const invalidateQuery = manager
+          .createQueryBuilder()
+          .update(Authentication)
+          .set({
+            logoutAt: now,
+            refreshTokenHash: null,
+            refreshTokenExpiresAt: null,
+            updatedAt: now,
+          })
+          .where('"userId" = :userId', { userId: data.id })
+          .andWhere('"logoutAt" IS NULL');
+
+        if (data.exceptSessionId) {
+          invalidateQuery.andWhere('"sessionId" <> :exceptSessionId', {
+            exceptSessionId: data.exceptSessionId,
+          });
+        }
+
+        await invalidateQuery.execute();
+        return updatedUser;
+      });
+    } catch (error: any) {
+      throw new Error(`Erro ao atualizar senha e sessões: ${error.message}`);
+    }
+  }
 
   /**
    * Cria um novo usuário no banco de dados com questões de segurança

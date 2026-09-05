@@ -2,15 +2,18 @@ import { v4 as uuidv4 } from "uuid";
 import { UserRepositoryProtocol } from "@/infra/db/interfaces/userRepositoryProtocol";
 import UserAuth from "@/auth/users/userAuth";
 import { ServerError } from "@/data/errors/ServerError";
-import { BusinessRuleError } from "@/data/errors/BusinessRuleError";
+import { UnauthorizedError } from "@/data/errors/UnauthorizedError";
 import { LoginUserUseCaseProtocol } from "@/data/usecases/interfaces/users/loginUserUseCaseProtocol";
 import { loginUserValidationSchema } from "@/data/usecases/validation/users/loginUserValidationSchema";
-import { NotFoundError } from "@/data/errors/NotFoundError";
 import { AuthenticationRepositoryProtocol } from "@/infra/db/interfaces/authenticationRepositoryProtocol";
 import { getIo } from "@/lib/socket";
 import { logger } from "@/loaders";
 import { NotificationRepositoryProtocol } from "@/infra/db/interfaces/notificationRepositoryProtocol";
 import { UserMonthlyEntryRankRepositoryProtocol } from "@/infra/db/interfaces/userMonthlyEntryRankRepositoryProtocol";
+
+const INVALID_CREDENTIALS_MESSAGE = "Credenciais inválidas";
+const FAKE_PASSWORD_HASH =
+  "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
 export class LoginUserUseCase implements LoginUserUseCaseProtocol {
   constructor(
@@ -23,9 +26,7 @@ export class LoginUserUseCase implements LoginUserUseCaseProtocol {
 
   /**
    * Autentica um usuário e gera um token JWT após um login bem-sucedido
-   * Além disso, gerencia sessões ativas do dia: reutiliza se existir, incrementando entryCount
-   * (exceto se a última entrada foi há menos de 1 minuto); cria nova se não
-   * Isso permite múltiplos logins no mesmo dia (ex.: diferentes navegadores) sem duplicar sessões, rastreando acessos
+   * Cada login cria uma sessão independente, permitindo revogação segura por dispositivo.
    * @param {LoginUserUseCaseProtocol.Params} data - As credenciais de login
    * @param {string} [data.login] - O login do usuário (opcional se o email for fornecido)
    * @param {string} data.password - A senha do usuário
@@ -45,53 +46,28 @@ export class LoginUserUseCase implements LoginUserUseCaseProtocol {
         login: data.login,
       });
 
-      if (!user) {
-        throw new NotFoundError("Usuário não encontrado");
-      }
-
       const isPasswordValid = await this.userAuth.comparePassword(
         data.password,
-        user.password
+        user?.password || FAKE_PASSWORD_HASH
       );
 
-      if (!isPasswordValid) {
-        throw new BusinessRuleError("Senha incorreta");
+      if (!user || !isPasswordValid) {
+        throw new UnauthorizedError(INVALID_CREDENTIALS_MESSAGE);
       }
 
       const now = new Date();
 
-      const activeSessionToday =
-        await this.authenticationRepository.findActiveSessionToday({
-          userId: user.id!,
-          date: now,
-        });
-
-      let sessionId: string;
+      const sessionId = uuidv4();
       const isOffensive = now.getHours() < 12;
-
-      if (activeSessionToday) {
-        sessionId = activeSessionToday.sessionId;
-
-        const timeSinceLastEntry =
-          now.getTime() - new Date(activeSessionToday.lastEntryAt).getTime();
-        const isWithinOneMinute = timeSinceLastEntry < 60000;
-
-        if (!isWithinOneMinute) {
-          await this.authenticationRepository.incrementEntryCount({
-            userId: user.id!,
-            sessionId,
-            now,
-          });
-        }
-      } else {
-        sessionId = uuidv4();
-        await this.authenticationRepository.create({
-          userId: user.id!,
-          loginAt: now,
-          sessionId,
-          isOffensive,
-        });
-      }
+      const refreshTokenData = this.userAuth.createRefreshToken();
+      await this.authenticationRepository.create({
+        userId: user.id!,
+        loginAt: now,
+        sessionId,
+        isOffensive,
+        refreshTokenHash: refreshTokenData.hash,
+        refreshTokenExpiresAt: refreshTokenData.expiresAt,
+      });
 
       const authResult = await this.userAuth.createUserToken({
         id: user.id!,
@@ -101,8 +77,9 @@ export class LoginUserUseCase implements LoginUserUseCaseProtocol {
         sessionId,
       });
 
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1;
+      try {
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
 
       let previousRanks =
         await this.userMonthlyEntryRankRepository.getAllRankedForMonth({
@@ -126,7 +103,7 @@ export class LoginUserUseCase implements LoginUserUseCaseProtocol {
           userId: user.id!,
           previousRanks,
         });
-      if (usersWhoLostPositions && usersWhoLostPositions.length > 0) {
+        if (usersWhoLostPositions && usersWhoLostPositions.length > 0) {
         const io = getIo();
 
         for (const user of usersWhoLostPositions) {
@@ -186,18 +163,22 @@ export class LoginUserUseCase implements LoginUserUseCaseProtocol {
             );
           }
         }
+        }
+      } catch (rankingError) {
+        const message =
+          rankingError instanceof Error
+            ? rankingError.message
+            : String(rankingError);
+        logger.warn(`Login concluído, mas o ranking não foi atualizado: ${message}`);
       }
 
-      return authResult;
+      return { ...authResult, refreshToken: refreshTokenData.token };
     } catch (error: any) {
       if (error.name === "ValidationError") {
         throw error;
       }
 
-      if (
-        error instanceof BusinessRuleError ||
-        error instanceof NotFoundError
-      ) {
+      if (error instanceof UnauthorizedError) {
         throw error;
       }
 

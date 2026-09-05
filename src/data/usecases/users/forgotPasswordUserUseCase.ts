@@ -6,6 +6,11 @@ import { BusinessRuleError } from "@/data/errors/BusinessRuleError";
 import { NotFoundError } from "@/data/errors/NotFoundError";
 import { ForgotPasswordUserUseCaseProtocol } from "../interfaces/users/forgotPasswordUseCaseProtocol";
 import { forgotPasswordUserValidationSchema } from "../validation/users/forgotPasswordUserValidationSchema";
+import { UnauthorizedError } from "@/data/errors/UnauthorizedError";
+
+const INVALID_RECOVERY_MESSAGE = "Dados de recuperação inválidos";
+const FAKE_SECURITY_ANSWER_HASH =
+  "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
 export class ForgotPasswordUserUseCase
   implements ForgotPasswordUserUseCaseProtocol
@@ -37,46 +42,58 @@ export class ForgotPasswordUserUseCase
       });
       const user = await this.userRepository.findOne({ login: data.login });
       if (!user) {
-        throw new NotFoundError("Usuário não encontrado");
+        await Promise.all(
+          data.securityQuestions.map((provided) =>
+            this.userAuth.compareSecurityAnswer(
+              String(provided.answer),
+              FAKE_SECURITY_ANSWER_HASH
+            )
+          )
+        );
+        throw new UnauthorizedError(INVALID_RECOVERY_MESSAGE);
       }
 
       if (!user.security_questions || user.security_questions.length === 0) {
-        throw new BusinessRuleError(
-          "Nenhuma questão de segurança registrada para este usuário"
-        );
+        throw new UnauthorizedError(INVALID_RECOVERY_MESSAGE);
       }
 
       const questions = data?.securityQuestions;
-      if (questions.length !== user.security_questions.length) {
-        throw new BusinessRuleError(
-          "Número de questões de segurança fornecidas não corresponde ao registrado"
-        );
-      }
+      let allAnswersAreValid =
+        questions.length === user.security_questions.length;
+      const providedQuestionKeys = new Set<string>();
 
       for (const provided of questions) {
+        providedQuestionKeys.add(String(provided.question));
         const stored = user.security_questions.find(
           (q) => q.question === provided.question
         );
-        if (!stored) {
-          throw new BusinessRuleError("Questão de segurança não encontrada");
-        }
         const isValidAnswer = await this.userAuth.compareSecurityAnswer(
           String(provided.answer),
-          String(stored.answer)
+          stored ? String(stored.answer) : FAKE_SECURITY_ANSWER_HASH
         );
-        if (!isValidAnswer) {
-          throw new BusinessRuleError("Resposta de segurança inválida");
-        }
+        allAnswersAreValid = allAnswersAreValid && !!stored && isValidAnswer;
+      }
+
+      if (
+        providedQuestionKeys.size !== user.security_questions.length ||
+        !allAnswersAreValid
+      ) {
+        throw new UnauthorizedError(INVALID_RECOVERY_MESSAGE);
       }
 
       const hashedPassword = await this.userAuth.hashPassword(
         data?.newPassword
       );
 
-      const updatedUser = await this.userRepository.updatePassword({
+      const passwordUpdate = {
         id: user.id,
         password: hashedPassword,
-      });
+      };
+      const updatedUser = this.userRepository.updatePasswordAndInvalidateSessions
+        ? await this.userRepository.updatePasswordAndInvalidateSessions(
+            passwordUpdate
+          )
+        : await this.userRepository.updatePassword(passwordUpdate);
 
       if (!updatedUser) {
         throw new BusinessRuleError("Falha ao atualizar a senha do usuário");
@@ -90,7 +107,8 @@ export class ForgotPasswordUserUseCase
 
       if (
         error instanceof BusinessRuleError ||
-        error instanceof NotFoundError
+        error instanceof NotFoundError ||
+        error instanceof UnauthorizedError
       ) {
         throw error;
       }

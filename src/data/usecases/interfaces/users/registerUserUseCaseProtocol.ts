@@ -23,6 +23,5 @@ export namespace RegisterUserUseCaseProtocol {
   };
   export type Result = {
     user: UserModel;
-    token: string;
   };
 }

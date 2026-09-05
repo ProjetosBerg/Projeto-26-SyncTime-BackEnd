@@ -15,11 +15,47 @@ import { makeGetStreakUserControllerFactory } from "@/main/factories/controllers
 import { makeUploadUserMiddleware } from "../middlewares/uploadUserMiddleware";
 import { makeGetInboxControllerFactory } from "@/main/factories/controllers/user/getInboxControllerFactory";
 import { makeGetByUserIdRankControllerFactory } from "@/main/factories/controllers/user/getByUserIdRankControllerFactory";
+import { makeRateLimitMiddleware } from "../middlewares/rateLimit";
+
+const normalizeLogin = (value: unknown): string =>
+  typeof value === "string" ? value.trim().toLowerCase() : "unknown";
+
+const loginRateLimit = makeRateLimitMiddleware({
+  limit: 10,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "login",
+  key: (req) => `${req.ip}:${normalizeLogin(req.body?.login)}`,
+});
+
+const registerRateLimit = makeRateLimitMiddleware({
+  limit: 5,
+  windowMs: 60 * 60 * 1000,
+  keyPrefix: "register",
+});
+
+const recoveryRateLimit = makeRateLimitMiddleware({
+  limit: 5,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "password-recovery",
+  key: (req) =>
+    `${req.ip}:${normalizeLogin(req.body?.login || req.query?.login)}`,
+});
+
+const passwordChangeRateLimit = makeRateLimitMiddleware({
+  limit: 5,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "password-change",
+  key: (req) => String(req.user?.id || req.ip),
+});
 
 export const routesUser = (router: Router) => {
-  router.get("/user/find-questions", (req: Request, res: Response) => {
-    makeFindQuestionsUserControllerFactory().handle(req, res);
-  });
+  router.get(
+    "/user/find-questions",
+    adapterMiddleware(recoveryRateLimit),
+    (req: Request, res: Response) => {
+      makeFindQuestionsUserControllerFactory().handle(req, res);
+    }
+  );
 
   router.get(
     "/user/get-presence",
@@ -63,15 +99,20 @@ export const routesUser = (router: Router) => {
 
   router.post(
     "/user/register",
+    adapterMiddleware(registerRateLimit),
     adapterMiddleware(makeUploadUserMiddleware()),
     (req: Request, res: Response) => {
       makeRegisterUserControllerFactory().handle(req, res);
     }
   );
 
-  router.post("/user/login", (req: Request, res: Response) => {
-    makeLoginUserControllerFactory().handle(req, res);
-  });
+  router.post(
+    "/user/login",
+    adapterMiddleware(loginRateLimit),
+    (req: Request, res: Response) => {
+      makeLoginUserControllerFactory().handle(req, res);
+    }
+  );
 
   router.post(
     "/user/logout",
@@ -81,12 +122,17 @@ export const routesUser = (router: Router) => {
     }
   );
 
-  router.patch("/user/forgot-password", (req: Request, res: Response) => {
-    makeForgotPasswordUserControllerFactory().handle(req, res);
-  });
+  router.patch(
+    "/user/forgot-password",
+    adapterMiddleware(recoveryRateLimit),
+    (req: Request, res: Response) => {
+      makeForgotPasswordUserControllerFactory().handle(req, res);
+    }
+  );
   router.patch(
     "/user/reset-password",
     adapterMiddleware(makeGetLoginMiddleware()),
+    adapterMiddleware(passwordChangeRateLimit),
     (req: Request, res: Response) => {
       makeResetPasswordUserControllerFactory().handle(req, res);
     }

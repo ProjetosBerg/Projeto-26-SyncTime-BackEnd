@@ -34,6 +34,12 @@ export class Authentication extends BaseEntity {
   @Column({ type: "timestamp", nullable: true })
   logoutAt!: Date | null;
 
+  @Column({ type: "varchar", length: 64, nullable: true, select: false })
+  refreshTokenHash!: string | null;
+
+  @Column({ type: "timestamp", nullable: true })
+  refreshTokenExpiresAt!: Date | null;
+
   @Column({ default: false })
   isOffensive!: boolean;
 

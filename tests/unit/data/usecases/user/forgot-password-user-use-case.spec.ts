@@ -6,6 +6,7 @@ import { BusinessRuleError } from "@/data/errors/BusinessRuleError";
 import { NotFoundError } from "@/data/errors/NotFoundError";
 import { ServerError } from "@/data/errors/ServerError";
 import { forgotPasswordUserValidationSchema } from "@/data/usecases/validation/users/forgotPasswordUserValidationSchema";
+import { UnauthorizedError } from "@/data/errors/UnauthorizedError";
 
 jest.mock(
   "@/data/usecases/validation/users/forgotPasswordUserValidationSchema"
@@ -106,7 +107,7 @@ describe("ForgotPasswordUserUseCase", () => {
     );
   });
 
-  test("should throw NotFoundError if user is not found", async () => {
+  test("should return a generic recovery error if user is not found", async () => {
     const { sut, userRepositorySpy } = makeSut();
 
     const input = {
@@ -119,14 +120,14 @@ describe("ForgotPasswordUserUseCase", () => {
     userRepositorySpy.findOne.mockResolvedValueOnce(null);
 
     await expect(sut.handle(input)).rejects.toThrow(
-      new NotFoundError("Usuário não encontrado")
+      new UnauthorizedError("Dados de recuperação inválidos")
     );
     expect(userRepositorySpy.findOne).toHaveBeenCalledWith({
       login: input.login,
     });
   });
 
-  test("should throw BusinessRuleError if no security questions are registered", async () => {
+  test("should return a generic error if no questions are registered", async () => {
     const { sut, userRepositorySpy } = makeSut();
 
     const input = {
@@ -142,16 +143,14 @@ describe("ForgotPasswordUserUseCase", () => {
     });
 
     await expect(sut.handle(input)).rejects.toThrow(
-      new BusinessRuleError(
-        "Nenhuma questão de segurança registrada para este usuário"
-      )
+      new UnauthorizedError("Dados de recuperação inválidos")
     );
     expect(userRepositorySpy.findOne).toHaveBeenCalledWith({
       login: input.login,
     });
   });
 
-  test("should throw BusinessRuleError if number of security questions does not match", async () => {
+  test("should return a generic error if question count does not match", async () => {
     const { sut } = makeSut();
 
     const input = {
@@ -162,13 +161,11 @@ describe("ForgotPasswordUserUseCase", () => {
     };
 
     await expect(sut.handle(input)).rejects.toThrow(
-      new BusinessRuleError(
-        "Número de questões de segurança fornecidas não corresponde ao registrado"
-      )
+      new UnauthorizedError("Dados de recuperação inválidos")
     );
   });
 
-  test("should throw BusinessRuleError if a security question is not found", async () => {
+  test("should return a generic error if a question is not found", async () => {
     const { sut } = makeSut();
 
     const input = {
@@ -182,11 +179,11 @@ describe("ForgotPasswordUserUseCase", () => {
     };
 
     await expect(sut.handle(input)).rejects.toThrow(
-      new BusinessRuleError("Questão de segurança não encontrada")
+      new UnauthorizedError("Dados de recuperação inválidos")
     );
   });
 
-  test("should throw BusinessRuleError if a security answer is invalid", async () => {
+  test("should return a generic error if an answer is invalid", async () => {
     const { sut, userAuthSpy } = makeSut();
 
     const input = {
@@ -199,7 +196,7 @@ describe("ForgotPasswordUserUseCase", () => {
     userAuthSpy.compareSecurityAnswer.mockResolvedValueOnce(false);
 
     await expect(sut.handle(input)).rejects.toThrow(
-      new BusinessRuleError("Resposta de segurança inválida")
+      new UnauthorizedError("Dados de recuperação inválidos")
     );
     expect(userAuthSpy.compareSecurityAnswer).toHaveBeenCalled();
   });

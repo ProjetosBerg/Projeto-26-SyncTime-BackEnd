@@ -1,8 +1,9 @@
 // src/presentation/controllers/users/GetPresenceUserController.ts
 import { Request, Response } from "express";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { GetPresenceUserUseCase } from "@/data/usecases/users/getPresenceUserUseCase";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
 
 export class GetPresenceUserController implements Controller {
   constructor(private readonly getPresenceUserService: GetPresenceUserUseCase) {
@@ -43,10 +44,7 @@ export class GetPresenceUserController implements Controller {
         message: "Dados de presença obtidos com sucesso",
       });
     } catch (error) {
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

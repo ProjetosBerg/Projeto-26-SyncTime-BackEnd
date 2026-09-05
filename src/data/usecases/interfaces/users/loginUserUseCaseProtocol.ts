@@ -14,6 +14,7 @@ export namespace LoginUserUseCaseProtocol {
   export type Result = {
     message: string;
     token: string | null;
+    refreshToken: string;
     user: {
       id: string;
       name: string;

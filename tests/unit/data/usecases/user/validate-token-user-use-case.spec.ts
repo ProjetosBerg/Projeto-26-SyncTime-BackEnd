@@ -1,6 +1,7 @@
 import { AuthenticationRepositoryProtocol } from "@/infra/db/interfaces/authenticationRepositoryProtocol";
 import { ValidateTokenUseCase } from "@/data/usecases/users/validateTokenUseCase";
 import { ServerError } from "@/data/errors/ServerError";
+import { UnauthorizedError } from "@/data/errors/UnauthorizedError";
 import { NotificationRepositoryProtocol } from "@/infra/db/interfaces/notificationRepositoryProtocol";
 
 export const makeAuthenticationRepositoryRepository =
@@ -63,6 +64,7 @@ const makeSut = () => {
 
   const validateData = {
     userId: "mock-user-id",
+    sessionId: "existing-session-id",
   };
 
   return {
@@ -77,12 +79,9 @@ describe("ValidateTokenUseCase", () => {
     jest.clearAllMocks();
   });
 
-  test("should validate token when already logged in today", async () => {
+  test("should increment an active session from the current day", async () => {
     const { sut, authenticationRepositoryRepositorySpy, validateData } =
       makeSut();
-
-    const sessionId = "existing-session-id";
-    const validateDataWithSession = { ...validateData, sessionId };
 
     const now = new Date();
     const mockSession = {
@@ -94,30 +93,53 @@ describe("ValidateTokenUseCase", () => {
       mockSession as any
     );
 
-    const result = await sut.handle(validateDataWithSession);
+    const result = await sut.handle(validateData);
 
     expect(
       authenticationRepositoryRepositorySpy.findActiveSession
     ).toHaveBeenCalledWith({
-      userId: validateDataWithSession.userId,
-      sessionId: validateDataWithSession.sessionId,
+      userId: validateData.userId,
+      sessionId: validateData.sessionId,
       isOrder: true,
     });
     expect(
       authenticationRepositoryRepositorySpy.incrementEntryCount
     ).toHaveBeenCalledWith({
-      userId: validateDataWithSession.userId,
-      sessionId: validateDataWithSession.sessionId,
+      userId: validateData.userId,
+      sessionId: validateData.sessionId,
       now: expect.any(Date),
     });
     expect(authenticationRepositoryRepositorySpy.create).not.toHaveBeenCalled();
     expect(result).toEqual({
       valid: true,
-      sessionId: validateDataWithSession.sessionId,
+      sessionId: validateData.sessionId,
     });
   });
 
-  test("should validate token and create new entry when not logged in today", async () => {
+  test("should create only a daily presence row for an active session from a previous day", async () => {
+    const { sut, authenticationRepositoryRepositorySpy, validateData } =
+      makeSut();
+    const now = new Date();
+
+    authenticationRepositoryRepositorySpy.findActiveSession.mockResolvedValue({
+      loginAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      lastEntryAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    } as any);
+
+    await sut.handle(validateData);
+
+    expect(
+      authenticationRepositoryRepositorySpy.incrementEntryCount
+    ).not.toHaveBeenCalled();
+    expect(authenticationRepositoryRepositorySpy.create).toHaveBeenCalledWith({
+      userId: validateData.userId,
+      sessionId: validateData.sessionId,
+      loginAt: expect.any(Date),
+      isOffensive: expect.any(Boolean),
+    });
+  });
+
+  test("should reject an inactive session instead of creating a new one", async () => {
     const { sut, authenticationRepositoryRepositorySpy, validateData } =
       makeSut();
 
@@ -125,32 +147,21 @@ describe("ValidateTokenUseCase", () => {
       undefined
     );
 
-    const result = await sut.handle(validateData);
+    await expect(sut.handle(validateData)).rejects.toThrow(
+      new UnauthorizedError("Sessão inválida ou expirada")
+    );
 
     expect(
       authenticationRepositoryRepositorySpy.findActiveSession
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: validateData.userId,
-        sessionId: expect.any(String),
-        isOrder: true,
-      })
-    );
+    ).toHaveBeenCalledWith({
+      userId: validateData.userId,
+      sessionId: validateData.sessionId,
+      isOrder: true,
+    });
     expect(
       authenticationRepositoryRepositorySpy.incrementEntryCount
     ).not.toHaveBeenCalled();
-    expect(authenticationRepositoryRepositorySpy.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: validateData.userId,
-        loginAt: expect.any(Date),
-        sessionId: expect.any(String),
-        isOffensive: expect.any(Boolean),
-      })
-    );
-    expect(result).toEqual({
-      valid: true,
-      sessionId: expect.any(String),
-    });
+    expect(authenticationRepositoryRepositorySpy.create).not.toHaveBeenCalled();
   });
 
   test("should throw ServerError for unexpected errors", async () => {
@@ -170,7 +181,7 @@ describe("ValidateTokenUseCase", () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: validateData.userId,
-        sessionId: expect.any(String),
+        sessionId: validateData.sessionId,
       })
     );
   });

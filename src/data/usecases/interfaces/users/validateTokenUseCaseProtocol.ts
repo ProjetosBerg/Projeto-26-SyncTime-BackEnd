@@ -7,7 +7,7 @@ export interface ValidateTokenUseCaseProtocol {
 export namespace ValidateTokenUseCaseProtocol {
   export type Params = {
     userId: string;
-    sessionId?: string;
+    sessionId: string;
   };
 
   export type Result = {

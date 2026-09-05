@@ -11,6 +11,9 @@ export interface UserRepositoryProtocol {
   updatePassword(
     data: UserRepositoryProtocol.UpdatePasswordParams
   ): Promise<UserModel | undefined>;
+  updatePasswordAndInvalidateSessions?(
+    data: UserRepositoryProtocol.UpdatePasswordAndInvalidateSessionsParams
+  ): Promise<UserModel | undefined>;
   updateUser(
     data: UserRepositoryProtocol.UpdateUserParams
   ): Promise<UserModel | undefined>;
@@ -41,6 +44,11 @@ export namespace UserRepositoryProtocol {
     id: UserModel["id"];
     password: UserModel["password"];
   };
+
+  export type UpdatePasswordAndInvalidateSessionsParams =
+    UpdatePasswordParams & {
+      exceptSessionId?: string;
+    };
 
   export type UpdateUserParams = {
     id: UserModel["id"];

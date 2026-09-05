@@ -1,10 +1,11 @@
 // presentation/controllers/transactions/exportTransactionController.ts
 import { Request, Response } from "express";
-import { ResponseStatus, getError } from "@/utils/service";
+import { ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { ExportTransactionUseCase } from "@/data/usecases/transactions/exportTransactionUseCase";
 import { FilterParam } from "../interfaces/FilterParam";
 import console from "console";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
 
 export class ExportTransactionController implements Controller {
   constructor(
@@ -79,19 +80,13 @@ export class ExportTransactionController implements Controller {
       stream.on("error", (err) => {
         console.error("Stream error:", err);
         if (!res.headersSent) {
-          res.status(500).json({
-            status: ResponseStatus.INTERNAL_SERVER_ERROR,
-            message: getError(err),
-          });
+          handleControllerError(res, err);
         }
       });
 
       return res;
     } catch (error: any) {
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

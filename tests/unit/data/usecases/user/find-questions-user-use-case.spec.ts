@@ -42,32 +42,28 @@ describe("FindQuestionsUserUseCase", () => {
     expect(userRepositoryRepositorySpy.findOne).toHaveBeenCalledTimes(1);
   });
 
-  test("should throw NotFoundError if user not found", async () => {
+  test("should return decoy questions if user is not found", async () => {
     const { sut, userRepositoryRepositorySpy } = makeSut();
     userRepositoryRepositorySpy.findOne.mockResolvedValue(null);
 
     const input = { login: "invalid_login" };
-    await expect(sut.handle(input)).rejects.toThrow(
-      new NotFoundError("Usuário não encontrado")
-    );
+    const result = await sut.handle(input);
+    expect(result.securityQuestions).toHaveLength(3);
     expect(userRepositoryRepositorySpy.findOne).toHaveBeenCalledWith({
       login: input.login,
     });
     expect(userRepositoryRepositorySpy.findOne).toHaveBeenCalledTimes(1);
   });
 
-  test("should throw BusinessRuleError if no security questions", async () => {
+  test("should return decoy questions if no questions are registered", async () => {
     const { sut, userRepositoryRepositorySpy } = makeSut();
     userRepositoryRepositorySpy.findOne.mockResolvedValue({
       ...mockUser,
       security_questions: [],
     });
 
-    await expect(sut.handle({ login: mockUser.login })).rejects.toThrow(
-      new BusinessRuleError(
-        "Nenhuma questão de segurança registrada para este usuário"
-      )
-    );
+    const result = await sut.handle({ login: mockUser.login });
+    expect(result.securityQuestions).toHaveLength(3);
     expect(userRepositoryRepositorySpy.findOne).toHaveBeenCalledWith({
       login: mockUser.login,
     });

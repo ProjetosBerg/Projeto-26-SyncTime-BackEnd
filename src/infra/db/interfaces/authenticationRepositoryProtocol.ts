@@ -66,6 +66,14 @@ export interface AuthenticationRepositoryProtocol {
   findActiveSessionToday(
     data: AuthenticationRepositoryProtocol.GetSessionDurationInDayParams
   ): Promise<Authentication | undefined>;
+
+  findActiveByRefreshTokenHash?(
+    data: AuthenticationRepositoryProtocol.FindByRefreshTokenHashParams
+  ): Promise<Authentication | undefined>;
+
+  rotateRefreshToken?(
+    data: AuthenticationRepositoryProtocol.RotateRefreshTokenParams
+  ): Promise<Authentication | undefined>;
 }
 
 export namespace AuthenticationRepositoryProtocol {
@@ -74,6 +82,8 @@ export namespace AuthenticationRepositoryProtocol {
     loginAt?: Date;
     sessionId: string;
     isOffensive: boolean;
+    refreshTokenHash?: string;
+    refreshTokenExpiresAt?: Date;
   };
 
   export type UpdateLogoutParams = {
@@ -118,5 +128,17 @@ export namespace AuthenticationRepositoryProtocol {
     userId: string;
     sessionId: string;
     isOrder?: boolean;
+  };
+
+  export type FindByRefreshTokenHashParams = {
+    refreshTokenHash: string;
+    now: Date;
+  };
+
+  export type RotateRefreshTokenParams = {
+    currentRefreshTokenHash: string;
+    newRefreshTokenHash: string;
+    newRefreshTokenExpiresAt: Date;
+    now: Date;
   };
 }

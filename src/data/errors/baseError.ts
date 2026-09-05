@@ -1,13 +1,10 @@
-import { ValidationError } from 'yup'
-
-export abstract class BaseError extends ValidationError {
-  private statusCode: number
+export abstract class BaseError extends Error {
+  private readonly statusCode: number
 
   constructor(message: string, statusCode: number) {
-    super(message, null, '')
+    super(message)
     this.statusCode = statusCode
     this.name = this.constructor.name
-    this.message = message
   }
 
   getStatusCode(): number {

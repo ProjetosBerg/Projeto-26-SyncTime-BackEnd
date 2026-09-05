@@ -42,10 +42,19 @@ export class ResetPasswordUserUseCase
 
       const hashedPassword = await this.userAuth.hashPassword(data.newPassword);
 
-      const updatedUser = await this.userRepository.updatePassword({
+      const passwordUpdate = {
         id: user.id,
         password: hashedPassword,
-      });
+        exceptSessionId: data.sessionId,
+      };
+      const updatedUser = this.userRepository.updatePasswordAndInvalidateSessions
+        ? await this.userRepository.updatePasswordAndInvalidateSessions(
+            passwordUpdate
+          )
+        : await this.userRepository.updatePassword({
+            id: passwordUpdate.id,
+            password: passwordUpdate.password,
+          });
 
       if (!updatedUser) {
         throw new BusinessRuleError("Falha ao atualizar a senha do usuário");

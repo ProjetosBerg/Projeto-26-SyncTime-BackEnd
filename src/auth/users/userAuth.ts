@@ -1,10 +1,35 @@
 import * as jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { createHash, randomBytes } from "node:crypto";
 import { ITokenPayload, IUser, IUserAuth } from "@/auth/interface/IUserAuth";
 
 class UserAuth implements IUserAuth {
-  private readonly JWT_SECRET: string =
-    process.env.JWT_SECRET || "your-secret-key";
+  private getJwtSecret(): string {
+    const secret = process.env.JWT_SECRET?.trim();
+
+    if (!secret) {
+      throw new Error("JWT_SECRET não configurado");
+    }
+
+    return secret;
+  }
+
+  createRefreshToken(): { token: string; hash: string; expiresAt: Date } {
+    const token = randomBytes(48).toString("base64url");
+    const ttlDays = Number(process.env.REFRESH_TOKEN_TTL_DAYS || 7);
+    const safeTtlDays =
+      Number.isInteger(ttlDays) && ttlDays >= 1 && ttlDays <= 30 ? ttlDays : 7;
+
+    return {
+      token,
+      hash: this.hashRefreshToken(token),
+      expiresAt: new Date(Date.now() + safeTtlDays * 24 * 60 * 60 * 1000),
+    };
+  }
+
+  hashRefreshToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
 
   /**
    * Cria um token JWT para um usuário, incluindo o sessionId no payload
@@ -28,7 +53,9 @@ class UserAuth implements IUserAuth {
         sessionId: user.sessionId || "",
       };
 
-      const token = jwt.sign(payload, this.JWT_SECRET, { expiresIn: "30d" });
+      const token = jwt.sign(payload, this.getJwtSecret(), {
+        expiresIn: "15m",
+      });
       return {
         message: "Você está autenticado",
         token,
@@ -69,7 +96,7 @@ class UserAuth implements IUserAuth {
    */
   async getUserByToken(token: string): Promise<ITokenPayload | null> {
     try {
-      const decoded = jwt.verify(token, this.JWT_SECRET) as ITokenPayload;
+      const decoded = jwt.verify(token, this.getJwtSecret()) as ITokenPayload;
       return {
         id: decoded.id,
         name: decoded.name,
@@ -89,7 +116,7 @@ class UserAuth implements IUserAuth {
    */
   async checkToken(token: string): Promise<boolean> {
     try {
-      jwt.verify(token, this.JWT_SECRET);
+      jwt.verify(token, this.getJwtSecret());
       return true;
     } catch (error) {
       return false;

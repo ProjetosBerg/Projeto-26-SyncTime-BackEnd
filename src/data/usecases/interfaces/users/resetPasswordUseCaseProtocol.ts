@@ -12,6 +12,7 @@ export namespace ResetPasswordUserUseCaseProtocol {
     oldPassword: UserModel["password"];
     newPassword: UserModel["password"];
     confirmNewPassword: UserModel["password"];
+    sessionId?: string;
   };
   export type Result = {
     message: string;

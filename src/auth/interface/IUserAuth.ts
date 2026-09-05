@@ -34,4 +34,12 @@ export interface IUserAuth {
   comparePassword(password: string, hashedPassword: string): Promise<boolean>;
 
   compareSecurityAnswer(answer: string, hashedAnswer: string): Promise<boolean>;
+
+  createRefreshToken(): {
+    token: string;
+    hash: string;
+    expiresAt: Date;
+  };
+
+  hashRefreshToken(token: string): string;
 }

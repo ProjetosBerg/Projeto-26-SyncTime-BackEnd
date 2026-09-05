@@ -1,8 +1,9 @@
 // Atualizado: src/presentation/controllers/users/ValidateTokenController.ts
 import { Request, Response } from "express";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { ValidateTokenUseCase } from "@/data/usecases/users/validateTokenUseCase";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
 
 export class ValidateTokenController implements Controller {
   constructor(private readonly validateTokenService: ValidateTokenUseCase) {
@@ -15,7 +16,7 @@ export class ValidateTokenController implements Controller {
   ): Promise<Response<IResponse>> {
     try {
       const { id: userId } = req.user || {};
-      const sessionId = req.user?.sessionId || req.body?.sessionId;
+      const sessionId = req.user?.sessionId;
 
       if (!sessionId) {
         return res.status(400).json({
@@ -46,10 +47,7 @@ export class ValidateTokenController implements Controller {
         message: "Token válido",
       });
     } catch (error) {
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

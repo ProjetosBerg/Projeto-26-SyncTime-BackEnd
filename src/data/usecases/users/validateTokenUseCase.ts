@@ -1,7 +1,7 @@
 import { ServerError } from "@/data/errors/ServerError";
+import { UnauthorizedError } from "@/data/errors/UnauthorizedError";
 import { AuthenticationRepositoryProtocol } from "@/infra/db/interfaces/authenticationRepositoryProtocol";
 import { UserMonthlyEntryRankRepositoryProtocol } from "@/infra/db/interfaces/userMonthlyEntryRankRepositoryProtocol";
-import { v4 as uuidv4 } from "uuid";
 import { ValidateTokenUseCaseProtocol } from "../interfaces/users/validateTokenUseCaseProtocol";
 import { getIo } from "@/lib/socket";
 import { logger } from "@/loaders";
@@ -18,11 +18,11 @@ export class ValidateTokenUseCase implements ValidateTokenUseCaseProtocol {
    * Valida o token e registra a presença/entrada do usuário
    * Para sessões existentes e ativas do DIA ATUAL, incrementa o entryCount e atualiza lastEntryAt
    * (exceto se a última entrada foi há menos de 1 minuto)
-   * Para novas sessões ou sessões ativas de dias anteriores, cria um novo registro
+   * Para uma sessão ativa de dia anterior, cria apenas o registro diário de presença
    * Isso permite rastrear streak/ofensiva, presença diária e contagem de entradas por dia (via soma de entryCount)
    * @param {ValidateTokenUseCaseProtocol.Params} data - Dados do user do token
    * @param {string} data.userId - ID do usuário
-   * @param {string} [data.sessionId] - ID da sessão do token (opcional)
+   * @param {string} data.sessionId - ID obrigatório da sessão contida no token
    * @returns {Promise<ValidateTokenUseCaseProtocol.Result>} Dados do user e sessionId
    * @throws {ServerError} Se ocorrer um erro inesperado
    */
@@ -30,7 +30,11 @@ export class ValidateTokenUseCase implements ValidateTokenUseCaseProtocol {
     data: ValidateTokenUseCaseProtocol.Params
   ): Promise<ValidateTokenUseCaseProtocol.Result> {
     try {
-      let sessionId = data.sessionId || uuidv4();
+      if (!data.sessionId) {
+        throw new UnauthorizedError("Sessão inválida ou expirada");
+      }
+
+      const sessionId = data.sessionId;
       const now = new Date();
 
       const activeSession =
@@ -40,37 +44,28 @@ export class ValidateTokenUseCase implements ValidateTokenUseCaseProtocol {
           isOrder: true,
         });
 
-      let shouldCreateNew = true;
-
-      if (activeSession) {
-        const isToday = this.isSameDay(activeSession.loginAt, now);
-        if (isToday) {
-          const timeSinceLastEntry =
-            now.getTime() - new Date(activeSession.lastEntryAt).getTime();
-          const isWithinOneMinute = timeSinceLastEntry < 60000;
-
-          if (!isWithinOneMinute) {
-            await this.authenticationRepository.incrementEntryCount({
-              userId: data.userId,
-              sessionId,
-              now,
-            });
-          }
-          shouldCreateNew = false;
-        }
+      if (!activeSession) {
+        throw new UnauthorizedError("Sessão inválida ou expirada");
       }
 
-      if (shouldCreateNew) {
-        if (!data.sessionId) {
-          sessionId = uuidv4();
-        }
-        const isOffensive = now.getHours() < 12;
+      if (this.isSameDay(activeSession.loginAt, now)) {
+        const timeSinceLastEntry =
+          now.getTime() - new Date(activeSession.lastEntryAt).getTime();
+        const isWithinOneMinute = timeSinceLastEntry < 60000;
 
+        if (!isWithinOneMinute) {
+          await this.authenticationRepository.incrementEntryCount({
+            userId: data.userId,
+            sessionId,
+            now,
+          });
+        }
+      } else {
         await this.authenticationRepository.create({
           userId: data.userId,
-          loginAt: now,
           sessionId,
-          isOffensive,
+          loginAt: now,
+          isOffensive: now.getHours() < 12,
         });
       }
 
@@ -166,6 +161,10 @@ export class ValidateTokenUseCase implements ValidateTokenUseCaseProtocol {
         sessionId,
       };
     } catch (error: any) {
+      if (error instanceof UnauthorizedError) {
+        throw error;
+      }
+
       const errorMessage =
         error.message || "Erro interno do servidor durante validação de token";
       console.error("Erro na validação do token:", errorMessage);
@@ -173,15 +172,14 @@ export class ValidateTokenUseCase implements ValidateTokenUseCaseProtocol {
     }
   }
 
-  /**
-   * Verifica se duas datas são do mesmo dia (ignorando hora/minutos)
-   * @private
-   */
   private isSameDay(date1: Date, date2: Date): boolean {
-    const d1 = new Date(date1);
-    d1.setHours(0, 0, 0, 0);
-    const d2 = new Date(date2);
-    d2.setHours(0, 0, 0, 0);
-    return d1.getTime() === d2.getTime();
+    const first = new Date(date1);
+    const second = new Date(date2);
+
+    return (
+      first.getFullYear() === second.getFullYear() &&
+      first.getMonth() === second.getMonth() &&
+      first.getDate() === second.getDate()
+    );
   }
 }

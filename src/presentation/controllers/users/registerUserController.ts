@@ -1,9 +1,21 @@
 import { Request, Response } from "express";
-import { ValidationError } from "yup";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { RegisterUserUseCase } from "@/data/usecases/users/registerUserUseCase";
 import cloudinary from "@/config/cloudinary";
+import logger from "@/loaders/logger";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
+
+const cleanupUploadedAvatar = async (publicId: string | null): Promise<void> => {
+  if (!publicId) return;
+
+  try {
+    await cloudinary.uploader.destroy(publicId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Falha ao limpar imagem após erro no cadastro: ${message}`);
+  }
+};
 
 export class RegisterUserController implements Controller {
   constructor(private readonly createUserService: RegisterUserUseCase) {
@@ -14,7 +26,8 @@ export class RegisterUserController implements Controller {
     req: Request,
     res: Response<IResponse>
   ): Promise<Response<IResponse>> {
-    let publicIdToDelete: string | null = null;
+    const publicIdToDelete = req.uploadedAvatar?.publicId || null;
+
     try {
       const {
         name,
@@ -23,15 +36,14 @@ export class RegisterUserController implements Controller {
         password,
         confirmpassword,
         securityQuestions,
-        imageUrl,
-        publicId,
       } = req.body;
 
       let parsedSecurityQuestions = securityQuestions;
       if (typeof securityQuestions === "string") {
         try {
           parsedSecurityQuestions = JSON.parse(securityQuestions);
-        } catch (parseError) {
+        } catch {
+          await cleanupUploadedAvatar(publicIdToDelete);
           return res.status(400).json({
             status: ResponseStatus.BAD_REQUEST,
             message:
@@ -40,52 +52,38 @@ export class RegisterUserController implements Controller {
         }
       }
 
-      const data = {
+      const createUser = await this.createUserService.handle({
         name,
         login,
         email,
         password,
         confirmpassword,
         securityQuestions: parsedSecurityQuestions,
-        imageUrl,
-        publicId,
-      };
+        imageUrl: req.uploadedAvatar?.imageUrl,
+        publicId: req.uploadedAvatar?.publicId,
+      });
 
-      if (publicId) {
-        publicIdToDelete = publicId;
-      }
+      const publicUser = createUser?.user
+        ? {
+            id: createUser.user.id,
+            name: createUser.user.name,
+            login: createUser.user.login,
+            email: createUser.user.email,
+            imageUrl: createUser.user.imageUrl,
+            bio: createUser.user.bio,
+            created_at: createUser.user.created_at,
+          }
+        : undefined;
 
-      const createUser = await this.createUserService.handle({ ...data });
       return res.status(201).json({
         status: ResponseStatus.OK,
-        data: createUser,
+        data: { user: publicUser },
         message: "Usuário criado com sucesso",
       });
     } catch (error) {
-      if (publicIdToDelete) {
-        try {
-          await cloudinary.uploader.destroy(publicIdToDelete);
-        } catch (deleteError) {
-          const message =
-            deleteError instanceof Error
-              ? deleteError.message
-              : String(deleteError);
-          throw new Error(
-            `Erro ao deletar imagem após falha no cadastro: ${message}`
-          );
-        }
-      }
+      await cleanupUploadedAvatar(publicIdToDelete);
 
-      if (error instanceof ValidationError) {
-        return res.status(400).json({
-          status: ResponseStatus.BAD_REQUEST,
-          errors: error.errors,
-        });
-      }
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-import { ValidationError } from "yup";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { CreateRecordTypeUseCase } from "@/data/usecases/recordTypes/createRecordTypesUseCase";
 import { checkUserAuthorization } from "@/presentation/validation/ValidateUser";
@@ -41,16 +41,7 @@ export class GetByUserIdRecordTypesController implements Controller {
         message: "Tipos de registros obtidos com sucesso",
       });
     } catch (error) {
-      if (error instanceof ValidationError) {
-        return res.status(400).json({
-          status: ResponseStatus.BAD_REQUEST,
-          errors: error.errors,
-        });
-      }
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

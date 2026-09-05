@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { GetInboxUserUseCase } from "@/data/usecases/users/getInboxUserUseCase";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
 
 export class GetInboxUserController implements Controller {
   constructor(private readonly getInboxUserUseCase: GetInboxUserUseCase) {}
@@ -21,10 +22,7 @@ export class GetInboxUserController implements Controller {
         message: "Inbox obtida com sucesso",
       });
     } catch (error) {
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

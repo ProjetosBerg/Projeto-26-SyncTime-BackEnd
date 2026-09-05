@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
-import { ValidationError } from "yup";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { checkUserAuthorization } from "@/presentation/validation/ValidateUser";
 import { ResetPasswordUserUseCase } from "@/data/usecases/users/resetPasswordUserUseCase";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
 
 export class ResetPasswordController implements Controller {
   constructor(
@@ -17,13 +17,14 @@ export class ResetPasswordController implements Controller {
     res: Response<IResponse>
   ): Promise<Response<IResponse>> {
     try {
-      const { login, newPassword, confirmNewPassword, id, oldPassword } =
+      const { newPassword, confirmNewPassword, id, oldPassword } =
         req.body;
       const data = {
-        login,
+        login: String(req.user?.login || ""),
         oldPassword,
         newPassword,
         confirmNewPassword,
+        sessionId: String(req.user?.sessionId || ""),
       };
 
       if (!id) {
@@ -48,16 +49,7 @@ export class ResetPasswordController implements Controller {
         message: "Senha alterada com sucesso",
       });
     } catch (error) {
-      if (error instanceof ValidationError) {
-        return res.status(400).json({
-          status: ResponseStatus.BAD_REQUEST,
-          errors: error.errors,
-        });
-      }
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

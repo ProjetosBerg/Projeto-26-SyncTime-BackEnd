@@ -1,6 +1,7 @@
-import e, { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
+import { NextFunction, Request, Response } from "express";
 import { Middleware } from "../protocols/middleware";
+import UserAuth from "@/auth/users/userAuth";
+import { AuthenticationRepositoryProtocol } from "@/infra/db/interfaces/authenticationRepositoryProtocol";
 
 export type JwtPayload = {
   id: string;
@@ -13,29 +14,41 @@ export type JwtPayload = {
   exp: number;
 };
 export class GetUserLogin implements Middleware {
+  constructor(
+    private readonly userAuth: UserAuth,
+    private readonly authenticationRepository: AuthenticationRepositoryProtocol
+  ) {}
+
   async handle(req: Request, res: Response, next: NextFunction): Promise<any> {
     const { authorization } = req.headers;
-    if (!authorization)
-      return res.status(401).json({ message: "Token não encontrado" });
-    const [, token] = authorization.split(" ");
-    if (!token)
-      return res.status(401).json({ message: "Token não encontrado" });
+    const token = this.userAuth.getToken({ authorization });
 
-    const decoded = jwt.decode(token) as JwtPayload;
-    if (!decoded)
+    if (!token) {
       return res.status(401).json({ message: "Token não encontrado" });
-    req.headers.login = decoded.login;
-    req.headers.nameUser = decoded.name;
+    }
 
     try {
-      const verified = jwt.verify(
-        token,
-        process.env.JWT_SECRET || "your-secret-key"
-      ) as JwtPayload;
+      const verified = (await this.userAuth.getUserByToken(
+        token
+      )) as JwtPayload | null;
 
-      if (!verified) {
-        return res.status(401).json({ message: "Token não encontrado" });
+      if (!verified?.id || !verified.sessionId) {
+        return res.status(401).json({ message: "Token inválido" });
       }
+
+      const activeSession =
+        await this.authenticationRepository.findActiveSession({
+          userId: verified.id,
+          sessionId: verified.sessionId,
+        });
+
+      if (!activeSession) {
+        return res.status(401).json({ message: "Sessão inválida ou encerrada" });
+      }
+
+      req.headers.login = verified.login;
+      req.headers.nameUser = verified.name;
+
       const user = {
         id: verified.id,
         login: verified.login,
@@ -47,7 +60,7 @@ export class GetUserLogin implements Middleware {
       req.user = user;
       next();
     } catch (error) {
-      return res.status(400).json({ message: "Token inválido" });
+      return res.status(401).json({ message: "Token inválido" });
     }
   }
 }

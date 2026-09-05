@@ -12,8 +12,15 @@ import { makeValidateTokenControllerFactory } from "./main/factories/controllers
 import { makeGetLoginMiddleware } from "./main/factories/middleware/getLogin";
 import { routesNotification } from "./presentation/routes/routerNotification";
 import { routesDashboard } from "./presentation/routes/routerDashboard";
+import { makeRefreshTokenControllerFactory } from "./main/factories/controllers/user/refreshTokenControllerFactory";
+import { makeRateLimitMiddleware } from "./presentation/middlewares/rateLimit";
 
 const router = Router();
+const refreshRateLimit = makeRateLimitMiddleware({
+  limit: 30,
+  windowMs: 15 * 60 * 1000,
+  keyPrefix: "refresh-token",
+});
 
 router.get("/health", (_req: Request, res: Response) => {
   res.status(200).json({ message: "ok" });
@@ -24,6 +31,14 @@ router.post(
   adapterMiddleware(makeGetLoginMiddleware()),
   (req: Request, res: Response) => {
     makeValidateTokenControllerFactory().handle(req, res);
+  }
+);
+
+router.post(
+  "/auth/refresh",
+  adapterMiddleware(refreshRateLimit),
+  (req: Request, res: Response) => {
+    makeRefreshTokenControllerFactory().handle(req, res);
   }
 );
 

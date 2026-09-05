@@ -1,8 +1,9 @@
 // src/presentation/controllers/users/GetStreakUserController.ts
 import { Request, Response } from "express";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { GetStreakUserUseCase } from "@/data/usecases/users/getStreakUserUseCase";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
 
 export class GetStreakUserController implements Controller {
   constructor(private readonly getStreakUserService: GetStreakUserUseCase) {
@@ -33,10 +34,7 @@ export class GetStreakUserController implements Controller {
         message: "Dados de streak obtidos com sucesso",
       });
     } catch (error) {
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

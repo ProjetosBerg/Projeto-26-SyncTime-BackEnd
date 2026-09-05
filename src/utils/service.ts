@@ -3,6 +3,7 @@ export enum ResponseStatus {
   BAD_REQUEST = "BAD_REQUEST",
   NOT_FOUND = "NOT_FOUND",
   INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR",
+  TOO_MANY_REQUESTS = "TOO_MANY_REQUESTS",
   UNAUTHORIZED = "UNAUTHORIZED",
   OK = "OK",
 }
@@ -22,10 +23,12 @@ export function getError(error: any): string {
 }
 
 const responseStatusMap = new Map([
+  [401, ResponseStatus.UNAUTHORIZED],
   [403, ResponseStatus.UNAUTHORIZED],
   [404, ResponseStatus.NOT_FOUND],
   [400, ResponseStatus.BAD_REQUEST],
   [500, ResponseStatus.INTERNAL_SERVER_ERROR],
+  [429, ResponseStatus.TOO_MANY_REQUESTS],
 ]);
 
 const getResponseStatus = (statusCode: number): ResponseStatus => {

@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
-import { ValidationError } from "yup";
-import { IResponse, ResponseStatus, getError } from "@/utils/service";
+import { IResponse, ResponseStatus } from "@/utils/service";
 import { Controller } from "@/presentation/protocols/controller";
 import { LoginUserUseCase } from "@/data/usecases/users/loginUserUseCase";
+import { handleControllerError } from "@/presentation/helpers/handleControllerError";
+import { setRefreshTokenCookie } from "@/presentation/helpers/refreshTokenCookie";
 
 export class LoginUserController implements Controller {
   constructor(private readonly loginUserService: LoginUserUseCase) {
@@ -20,22 +21,18 @@ export class LoginUserController implements Controller {
         password,
       };
       const result = await this.loginUserService.handle({ ...data });
+      const { refreshToken, ...publicResult } = result;
+      if (refreshToken) {
+        setRefreshTokenCookie(res, refreshToken);
+      }
+      res.setHeader("Cache-Control", "no-store");
       return res.status(200).json({
         status: ResponseStatus.OK,
-        data: result,
+        data: publicResult,
         message: "Usuário logado com sucesso",
       });
     } catch (error) {
-      if (error instanceof ValidationError) {
-        return res.status(400).json({
-          status: ResponseStatus.BAD_REQUEST,
-          errors: error.errors,
-        });
-      }
-      return res.status(500).json({
-        status: ResponseStatus.INTERNAL_SERVER_ERROR,
-        message: getError(error),
-      });
+      return handleControllerError(res, error);
     }
   }
 }

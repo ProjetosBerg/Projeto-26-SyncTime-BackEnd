@@ -1,11 +1,10 @@
 import { UserRepositoryProtocol } from "@/infra/db/interfaces/userRepositoryProtocol";
 import UserAuth from "@/auth/users/userAuth";
 import { mockUser } from "@/tests/unit/mocks/user/mockUser";
-import { BusinessRuleError } from "@/data/errors/BusinessRuleError";
 import { IUser } from "@/auth/interface/IUserAuth";
 import { LoginUserUseCase } from "@/data/usecases/users/loginUserUseCase";
-import { NotFoundError } from "@/data/errors/NotFoundError";
 import { ServerError } from "@/data/errors/ServerError";
+import { UnauthorizedError } from "@/data/errors/UnauthorizedError";
 import { NotificationRepositoryProtocol } from "@/infra/db/interfaces/notificationRepositoryProtocol";
 
 export const makeUserRepositoryRepository =
@@ -30,6 +29,11 @@ export const makeUserAuthRepositoryRepository = (): jest.Mocked<UserAuth> => {
     message: "Token created successfully",
     token: "valid_token",
     user: mockUser,
+  });
+  userAuth.createRefreshToken = jest.fn().mockReturnValue({
+    token: "valid-refresh-token",
+    hash: "valid-refresh-token-hash",
+    expiresAt: new Date("2030-01-01T00:00:00.000Z"),
   });
   return userAuth;
 };
@@ -142,6 +146,8 @@ describe("LoginUserUseCase", () => {
         loginAt: expect.any(Date),
         sessionId: expect.any(String),
         isOffensive: expect.any(Boolean),
+        refreshTokenHash: "valid-refresh-token-hash",
+        refreshTokenExpiresAt: new Date("2030-01-01T00:00:00.000Z"),
       })
     );
     expect(
@@ -158,24 +164,34 @@ describe("LoginUserUseCase", () => {
     expect(result).toEqual({
       message: "Token created successfully",
       token: "valid_token",
+      refreshToken: "valid-refresh-token",
       user: mockUser,
     });
   });
 
-  test("should throw NotFoundError if user is not found", async () => {
-    const { sut, userRepositoryRepositorySpy, loginData } = makeSut();
+  test("should return a generic error if user is not found", async () => {
+    const {
+      sut,
+      userRepositoryRepositorySpy,
+      userAuthRepositoryRepositorySpy,
+      loginData,
+    } = makeSut();
 
     userRepositoryRepositorySpy.findOne.mockResolvedValue(null);
 
     await expect(sut.handle(loginData)).rejects.toThrow(
-      new NotFoundError("Usuário não encontrado")
+      new UnauthorizedError("Credenciais inválidas")
     );
     expect(userRepositoryRepositorySpy.findOne).toHaveBeenCalledWith({
       login: mockUser.login,
     });
+    expect(userAuthRepositoryRepositorySpy.comparePassword).toHaveBeenCalledWith(
+      loginData.password,
+      "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+    );
   });
 
-  test("should throw BusinessRuleError if password is incorrect", async () => {
+  test("should return the same generic error if password is incorrect", async () => {
     const {
       sut,
       userRepositoryRepositorySpy,
@@ -187,7 +203,7 @@ describe("LoginUserUseCase", () => {
     userAuthRepositoryRepositorySpy.comparePassword.mockResolvedValue(false);
 
     await expect(sut.handle(loginData)).rejects.toThrow(
-      new BusinessRuleError("Senha incorreta")
+      new UnauthorizedError("Credenciais inválidas")
     );
     expect(
       userAuthRepositoryRepositorySpy.comparePassword

@@ -8,6 +8,56 @@ export class AuthenticationRepository
 {
   constructor() {}
 
+  async findActiveByRefreshTokenHash(
+    data: AuthenticationRepositoryProtocol.FindByRefreshTokenHashParams
+  ): Promise<Authentication | undefined> {
+    try {
+      const repository = getRepository(Authentication);
+      const session = await repository
+        .createQueryBuilder("authentication")
+        .where('authentication."refreshTokenHash" = :refreshTokenHash', {
+          refreshTokenHash: data.refreshTokenHash,
+        })
+        .andWhere('authentication."refreshTokenExpiresAt" > :now', {
+          now: data.now,
+        })
+        .andWhere('authentication."logoutAt" IS NULL')
+        .getOne();
+
+      return session || undefined;
+    } catch (error: any) {
+      throw new Error(`Erro ao buscar refresh token: ${error.message}`);
+    }
+  }
+
+  async rotateRefreshToken(
+    data: AuthenticationRepositoryProtocol.RotateRefreshTokenParams
+  ): Promise<Authentication | undefined> {
+    try {
+      const repository = getRepository(Authentication);
+      const result = await repository
+        .createQueryBuilder()
+        .update(Authentication)
+        .set({
+          refreshTokenHash: data.newRefreshTokenHash,
+          refreshTokenExpiresAt: data.newRefreshTokenExpiresAt,
+          updatedAt: data.now,
+        })
+        .where('"refreshTokenHash" = :currentRefreshTokenHash', {
+          currentRefreshTokenHash: data.currentRefreshTokenHash,
+        })
+        .andWhere('"refreshTokenExpiresAt" > :now', { now: data.now })
+        .andWhere('"logoutAt" IS NULL')
+        .returning("*")
+        .execute();
+
+      const rotatedSession = result.raw?.[0] as Authentication | undefined;
+      return rotatedSession ? repository.create(rotatedSession) : undefined;
+    } catch (error: any) {
+      throw new Error(`Erro ao rotacionar refresh token: ${error.message}`);
+    }
+  }
+
   /**
    * Verifica se o usuário já tem registro de login no dia específico
    * @param {Object} data - Critérios de verificação
@@ -85,6 +135,8 @@ export class AuthenticationRepository
         isOffensive: data.isOffensive,
         lastEntryAt: data.loginAt || new Date(),
         entryCount: 1,
+        refreshTokenHash: data.refreshTokenHash || null,
+        refreshTokenExpiresAt: data.refreshTokenExpiresAt || null,
       });
       newAuth.setIsOffensive();
       const savedAuth = await repository.save(newAuth);
@@ -171,17 +223,27 @@ export class AuthenticationRepository
   ): Promise<Authentication | undefined> {
     try {
       const repository = getRepository(Authentication);
-      const auth = await repository.findOne({
-        where: { sessionId: data.sessionId },
-        order: { createdAt: "DESC" },
-      });
-      if (!auth) {
+      const now = data.logoutAt || new Date();
+      const result = await repository
+        .createQueryBuilder()
+        .update(Authentication)
+        .set({
+          logoutAt: now,
+          refreshTokenHash: null,
+          refreshTokenExpiresAt: null,
+          updatedAt: now,
+        })
+        .where('"sessionId" = :sessionId', { sessionId: data.sessionId })
+        .andWhere('"logoutAt" IS NULL')
+        .returning("*")
+        .execute();
+
+      const updatedRows = result.raw as Authentication[];
+      if (!updatedRows?.length) {
         throw new Error("Sessão de autenticação não encontrada");
       }
-      auth.logoutAt = data.logoutAt || new Date();
-      auth.updatedAt = new Date();
-      const updatedAuth = await repository.save(auth);
-      return updatedAuth;
+
+      return repository.create(updatedRows[updatedRows.length - 1]);
     } catch (error: any) {
       throw new Error(
         `Erro ao atualizar logout de autenticação: ${error.message}`

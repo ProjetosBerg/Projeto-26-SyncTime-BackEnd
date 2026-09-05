@@ -15,13 +15,17 @@ export const editUserByIdValidationSchema = yup.object().shape({
       (value) => !value || value === value.toLowerCase()
     ),
 
-  security_questions: yup
+  securityQuestions: yup
     .array()
     .min(1, "Pelo menos uma questão de segurança é necessária")
+    .max(5, "No máximo 5 perguntas de segurança são permitidas")
+    .test("unique-questions", "As perguntas devem ser diferentes", (value) =>
+      value ? new Set(value.map((item) => item?.question)).size === value.length : true
+    )
     .of(
       yup.object().shape({
-        question: yup.string().required("Pergunta de segurança é obrigatória"),
-        answer: yup.string().required("Resposta de segurança é obrigatória"),
+        question: yup.string().max(100).required("Pergunta de segurança é obrigatória"),
+        answer: yup.string().max(200).required("Resposta de segurança é obrigatória"),
       })
     ),
   bio: yup

@@ -5,6 +5,10 @@ import env from "env-var";
 import { Middleware } from "@/presentation/protocols/middleware";
 import cloudinary from "@/config/cloudinary";
 import * as fs from "fs";
+import logger from "@/loaders/logger";
+import { ResponseStatus } from "@/utils/service";
+
+class UploadValidationError extends Error {}
 
 const ensureTempDir = () => {
   const tempDir = env.get("UPLOAD_TEMP_DIR").default("uploads/temp").asString();
@@ -38,11 +42,46 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback
 ) => {
-  if (file.mimetype.startsWith("image/")) {
+  const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+  if (allowedMimeTypes.has(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(null, false);
+    cb(
+      new UploadValidationError(
+        "Formato de imagem não permitido. Use JPEG, PNG ou WebP."
+      )
+    );
   }
+};
+
+const detectImageMimeType = (fileData: Buffer): string | null => {
+  if (
+    fileData.length >= 3 &&
+    fileData[0] === 0xff &&
+    fileData[1] === 0xd8 &&
+    fileData[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+
+  if (
+    fileData.length >= 8 &&
+    fileData.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    )
+  ) {
+    return "image/png";
+  }
+
+  if (
+    fileData.length >= 12 &&
+    fileData.subarray(0, 4).toString("ascii") === "RIFF" &&
+    fileData.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  return null;
 };
 
 const upload = multer({
@@ -88,14 +127,22 @@ export const makeUploadUserMiddleware = (): Middleware => {
             fileData = fs.readFileSync(req.file.path!);
           }
 
-          const originalNameWithoutExt =
-            path.parse(req.file.originalname).name + "_" + Date.now();
+          const detectedMimeType = detectImageMimeType(fileData);
+          if (!detectedMimeType || detectedMimeType !== req.file.mimetype) {
+            throw new UploadValidationError(
+              "O conteúdo do arquivo não corresponde a uma imagem válida"
+            );
+          }
+
+          const safePublicId = `avatar_${Date.now()}_${Math.round(
+            Math.random() * 1e9
+          )}`;
 
           const uploadResult = await new Promise<any>((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
               {
                 folder: "users/avatars",
-                public_id: originalNameWithoutExt,
+                public_id: safePublicId,
                 transformation: [
                   { width: 300, height: 300, crop: "fill", gravity: "face" },
                 ],
@@ -108,8 +155,10 @@ export const makeUploadUserMiddleware = (): Middleware => {
             stream.end(fileData);
           });
 
-          (req as any).body.imageUrl = uploadResult.secure_url;
-          (req as any).body.publicId = uploadResult.public_id;
+          req.uploadedAvatar = {
+            imageUrl: uploadResult.secure_url,
+            publicId: uploadResult.public_id,
+          };
 
           if (req.file!.path && !req.file!.buffer) {
             try {
@@ -127,15 +176,51 @@ export const makeUploadUserMiddleware = (): Middleware => {
               fs.unlinkSync(req.file.path);
             } catch {}
           }
-          return res.status(400).json({
-            error: "Erro no upload da imagem: " + (error as Error).message,
+          if (error instanceof UploadValidationError) {
+            return res.status(400).json({
+              status: ResponseStatus.BAD_REQUEST,
+              message: error.message,
+            });
+          }
+
+          logger.error(
+            `Falha interna no upload do avatar: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+          return res.status(500).json({
+            status: ResponseStatus.INTERNAL_SERVER_ERROR,
+            message: "Erro interno ao processar a imagem",
           });
         }
       })
       .catch((error) => {
-        return res
-          .status(400)
-          .json({ error: error.message || "Erro no processamento do arquivo" });
+        if (error instanceof multer.MulterError) {
+          return res.status(400).json({
+            status: ResponseStatus.BAD_REQUEST,
+            message:
+              error.code === "LIMIT_FILE_SIZE"
+                ? "A imagem deve ter no máximo 5 MB"
+                : "Arquivo de imagem inválido",
+          });
+        }
+
+        if (error instanceof UploadValidationError) {
+          return res.status(400).json({
+            status: ResponseStatus.BAD_REQUEST,
+            message: error.message,
+          });
+        }
+
+        logger.error(
+          `Falha ao processar upload: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+        return res.status(500).json({
+          status: ResponseStatus.INTERNAL_SERVER_ERROR,
+          message: "Erro interno ao processar a imagem",
+        });
       });
   };
 

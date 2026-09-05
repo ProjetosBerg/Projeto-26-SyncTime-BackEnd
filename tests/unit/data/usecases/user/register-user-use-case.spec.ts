@@ -3,7 +3,6 @@ import { UserRepositoryProtocol } from "@/infra/db/interfaces/userRepositoryProt
 import UserAuth from "@/auth/users/userAuth";
 import { mockUser } from "@/tests/unit/mocks/user/mockUser";
 import { BusinessRuleError } from "@/data/errors/BusinessRuleError";
-import { IUser } from "@/auth/interface/IUserAuth";
 
 export const makeUserRepositoryRepository =
   (): jest.Mocked<UserRepositoryProtocol> => ({
@@ -53,7 +52,7 @@ describe("RegisterUserUseCase", () => {
     jest.clearAllMocks();
   });
 
-  test("should register a user and return user data with token", async () => {
+  test("should register a user without creating an authenticated session", async () => {
     const {
       sut,
       userRepositoryRepositorySpy,
@@ -78,7 +77,6 @@ describe("RegisterUserUseCase", () => {
 
     expect(result).toEqual({
       user: mockUser,
-      token: "valid_token",
     });
     expect(userRepositoryRepositorySpy.findOne).toHaveBeenCalledTimes(2);
     expect(userRepositoryRepositorySpy.findOne).toHaveBeenCalledWith({
@@ -110,14 +108,7 @@ describe("RegisterUserUseCase", () => {
       imageUrl: input.imageUrl,
       publicId: input.publicId,
     });
-    expect(
-      userAuthRepositoryRepositorySpy.createUserToken
-    ).toHaveBeenCalledWith({
-      id: mockUser.id,
-      login: mockUser.login,
-      name: mockUser.name,
-      email: mockUser.email,
-    });
+    expect(userAuthRepositoryRepositorySpy.createUserToken).not.toHaveBeenCalled();
   });
 
   test("should throw BusinessRuleError if email already exists", async () => {
@@ -220,46 +211,4 @@ describe("RegisterUserUseCase", () => {
     });
   });
 
-  test("should throw BusinessRuleError if token creation fails", async () => {
-    const { sut, userAuthRepositoryRepositorySpy } = makeSut();
-
-    const input = {
-      name: mockUser.name,
-      login: mockUser.login,
-      email: mockUser.email,
-      password: mockUser.password,
-      confirmpassword: mockUser.password,
-      securityQuestions: mockUser.security_questions,
-      imageUrl: "https://example.com/image.jpg",
-      publicId: "public_id_123",
-    };
-
-    userAuthRepositoryRepositorySpy.createUserToken.mockResolvedValueOnce({
-      message: "Falha ao gerar token de autenticação para o usuário",
-      token: null,
-      user: mockUser as IUser,
-    });
-
-    await expect(sut.handle(input)).rejects.toThrow(
-      new BusinessRuleError(
-        "Falha ao gerar token de autenticação para o usuário"
-      )
-    );
-    expect(
-      userAuthRepositoryRepositorySpy.hashSecurityAnswer
-    ).toHaveBeenCalledTimes(input.securityQuestions.length);
-    input.securityQuestions.forEach((question, index) => {
-      expect(
-        userAuthRepositoryRepositorySpy.hashSecurityAnswer
-      ).toHaveBeenNthCalledWith(index + 1, question.answer);
-    });
-    expect(
-      userAuthRepositoryRepositorySpy.createUserToken
-    ).toHaveBeenCalledWith({
-      id: mockUser.id,
-      login: mockUser.login,
-      name: mockUser.name,
-      email: mockUser.email,
-    });
-  });
 });
