@@ -101,7 +101,10 @@ export class TransactionRepository implements TransactionRepositoryProtocol {
 
     return {
       ...transaction,
-      monthly_record_id: transaction?.monthly_record!.id,
+      monthly_record_id: transaction.monthly_record.id,
+      category_id: transaction.category.id,
+      category_name: transaction.category.name,
+      user_id: transaction.user.id,
     };
   }
 
@@ -172,6 +175,14 @@ export class TransactionRepository implements TransactionRepositoryProtocol {
     if (data.amount !== undefined) transaction.amount = data.amount;
     if (data.transaction_date !== undefined)
       transaction.transaction_date = data.transaction_date;
+    if (data.monthly_record_id !== undefined) {
+      transaction.monthly_record = {
+        id: data.monthly_record_id,
+      } as MonthlyRecord;
+    }
+    if (data.category_id !== undefined) {
+      transaction.category = { id: data.category_id } as Category;
+    }
 
     const updatedTransaction = await this.repository.save(transaction);
     return updatedTransaction;

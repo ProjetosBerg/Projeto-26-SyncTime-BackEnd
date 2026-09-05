@@ -242,12 +242,13 @@ export class MonthlyRecordRepository
 
     const updatedData: Partial<MonthlyRecord> = {};
 
-    if (data?.title) updatedData.title = data.title;
-    if (data?.description) updatedData.description = data.description;
-    if (data?.goal) updatedData.goal = data.goal;
-    if (data?.initial_balance)
+    if (data.title !== undefined) updatedData.title = data.title;
+    if (data.description !== undefined)
+      updatedData.description = data.description;
+    if (data.goal !== undefined) updatedData.goal = data.goal;
+    if (data.initial_balance !== undefined)
       updatedData.initial_balance = data.initial_balance;
-    if (data?.status) updatedData.status = data.status;
+    if (data.status !== undefined) updatedData.status = data.status;
 
     await this.repository.update(
       { id: data.id, user: { id: data.userId } },

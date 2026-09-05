@@ -6,6 +6,7 @@ import { DeleteTransactionUseCaseProtocol } from "@/data/usecases/interfaces/tra
 import { TransactionRepositoryProtocol } from "@/infra/db/interfaces/transactionRepositoryProtocol";
 import { deleteTransactionValidationSchema } from "../validation/transactions/deleteTransactionValidationSchema";
 import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
+import logger from "@/loaders/logger";
 
 /**
  * Exclui uma transação pelo seu ID para um usuário específico, incluindo seus valores de campos customizados associados
@@ -63,15 +64,25 @@ export class DeleteTransactionUseCase
         );
       }
 
-      await this.transactionCustomFieldRepository.deleteByTransactionId({
-        transaction_id: data.transactionId,
-        user_id: data.userId,
-      });
-
       await this.transactionRepository.delete({
         id: data.transactionId,
         userId: data.userId,
       });
+
+      try {
+        await this.transactionCustomFieldRepository.deleteByTransactionId({
+          transaction_id: data.transactionId,
+          user_id: data.userId,
+        });
+      } catch (cleanupError) {
+        logger.warn(
+          `Transação ${data.transactionId} excluída, mas os campos customizados órfãos não foram removidos: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }`
+        );
+      }
     } catch (error: any) {
       if (error.name === "ValidationError") {
         throw error;

@@ -52,19 +52,19 @@ export class GetDashboardCategoryUseCase
       if (categories.length === 0) {
         throw new NotFoundError("Nenhuma categoria encontrada");
       }
-      const allMonthlyRecords: any = [];
-      for (const category of categories) {
-        const { records } = await this.monthlyRecordRepository.findByUserId({
-          userId: data.userId,
-          categoryId: category!.id,
-          page: 1,
-          limit: 1000,
-        });
-        if (records.length === 0) {
-          continue;
-        }
-        allMonthlyRecords.push(...records);
-      }
+      const recordsByCategory = await Promise.all(
+        categories.map((category) =>
+          this.monthlyRecordRepository.findByUserId({
+            userId: data.userId,
+            categoryId: category!.id,
+            page: 1,
+            limit: 1000,
+          })
+        )
+      );
+      const allMonthlyRecords = recordsByCategory.flatMap(
+        ({ records }) => records
+      );
       let filteredRecords = allMonthlyRecords;
       if (data.startDate || data.endDate) {
         filteredRecords = this.filterRecordsByDate(
@@ -184,6 +184,12 @@ export class GetDashboardCategoryUseCase
   ): Promise<DashboardData["detailedData"]> {
     const detailedData: DashboardData["detailedData"] = [];
     for (const category of categories) {
+      const { customFields: customFieldDefs } =
+        await this.customFieldRepository.findByRecordTypeId({
+          record_type_id: category!.record_type_id,
+          category_id: category!.id,
+          user_id: userId,
+        });
       const categoryRecords = monthlyRecords.filter(
         (r) => r.category_id === category!.id
       );
@@ -201,12 +207,6 @@ export class GetDashboardCategoryUseCase
                 );
               let customFields: any[] = [];
               if (customFieldValues.length > 0) {
-                const { customFields: customFieldDefs } =
-                  await this.customFieldRepository.findByRecordTypeId({
-                    record_type_id: category!.record_type_id,
-                    category_id: category!.id,
-                    user_id: userId,
-                  });
                 customFields = customFieldValues.map((value) => {
                   const cfDef = customFieldDefs.find(
                     (cf) => cf.id === value.custom_field_id
@@ -222,7 +222,7 @@ export class GetDashboardCategoryUseCase
                 id: transaction.id,
                 title: transaction.title,
                 description: transaction.description,
-                amount: parseFloat(transaction.amount),
+                amount: this.toFiniteNumber(transaction.amount),
                 transactionDate: transaction.transaction_date,
                 customFields:
                   customFields.length > 0 ? customFields : undefined,
@@ -238,7 +238,7 @@ export class GetDashboardCategoryUseCase
             title: record.title,
             description: record.description,
             goal: record.goal,
-            initialBalance: parseFloat(record.initial_balance || 0),
+            initialBalance: this.toFiniteNumber(record.initial_balance),
             month: record.month,
             year: record.year,
             status: record.status,
@@ -442,7 +442,7 @@ export class GetDashboardCategoryUseCase
               if (cf.type === "multiple" && Array.isArray(cf.value)) {
                 valueKey = cf.value.join(", ");
               } else {
-                valueKey = cf.value.toString();
+                valueKey = String(cf.value ?? "Sem valor");
               }
               if (!customFieldMap.has(label)) {
                 customFieldMap.set(label, new Map<string, number>());
@@ -529,16 +529,14 @@ export class GetDashboardCategoryUseCase
   ): DashboardData["goalProgressData"] {
     return detailedData.flatMap((item) =>
       item.monthlyRecords.map((record) => {
+        const goal = this.toFiniteNumber(record.goal);
         const currentTotal =
           record.initialBalance + record.transactionsSummary.totalAmount;
-        const progress =
-          record.goal && typeof record.goal === "number" && record.goal > 0
-            ? (currentTotal / record.goal) * 100
-            : 0;
+        const progress = goal > 0 ? (currentTotal / goal) * 100 : 0;
         return {
           recordId: record.id,
           title: record.title,
-          goal: record.goal,
+          goal,
           initialBalance: record.initialBalance,
           currentTotal,
           progress: parseFloat(progress.toFixed(2)),
@@ -637,7 +635,7 @@ export class GetDashboardCategoryUseCase
               if (cf.type === "multiple" && Array.isArray(cf.value)) {
                 valueKey = cf.value.join(", ");
               } else {
-                valueKey = cf.value.toString();
+                valueKey = String(cf.value ?? "Sem valor");
               }
               agg.counts.set(valueKey, (agg.counts.get(valueKey) || 0) + 1);
               if (typeof cf.value === "number") {
@@ -762,6 +760,10 @@ export class GetDashboardCategoryUseCase
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  }
+  private toFiniteNumber(value: unknown): number {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
   private generateCustomChartsData(
     detailedData: DashboardData["detailedData"],

@@ -22,13 +22,13 @@ export class MonthlyRecord extends BaseEntity {
   title!: string;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  description!: string;
+  description!: string | null;
 
   @Column({ type: "varchar", length: 255 })
   goal!: string;
 
   @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
-  initial_balance!: number;
+  initial_balance!: number | null;
 
   @Column({ type: "integer" })
   month!: number;

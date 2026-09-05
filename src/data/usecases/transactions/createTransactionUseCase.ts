@@ -16,6 +16,7 @@ import { CustomFieldsRepositoryProtocol } from "@/infra/db/interfaces/customFiel
 import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
 import { validateFieldValueByType } from "./utils/validateFieldValueByType";
 import { CustomFieldValueWithMetadata } from "./utils/customFieldValueWithMetadata";
+import logger from "@/loaders/logger";
 
 /**
  * Cria uma nova transação para um usuário específico e um registro mensal
@@ -54,6 +55,8 @@ export class CreateTransactionUseCase
     transaction: TransactionModelMock;
     customFields?: CustomFieldValueWithMetadata[];
   }> {
+    let createdTransactionId: string | undefined;
+
     try {
       await createTransactionValidationSchema.validate(data, {
         abortEarly: false,
@@ -141,6 +144,14 @@ export class CreateTransactionUseCase
         );
       }
 
+      const monthlyRecordCategoryId =
+        monthlyRecord.category?.id ?? monthlyRecord.category_id;
+      if (monthlyRecordCategoryId !== data.categoryId) {
+        throw new BusinessRuleError(
+          "O registro mensal não pertence à categoria informada"
+        );
+      }
+
       const transactionDate = new Date(data.transactionDate);
       const recordMonth = monthlyRecord.month;
       const recordYear = monthlyRecord.year;
@@ -162,6 +173,7 @@ export class CreateTransactionUseCase
         category_id: data.categoryId,
         user_id: data.userId,
       });
+      createdTransactionId = transaction.id;
 
       if (data.customFields && data.customFields.length > 0) {
         for (const cfValue of data.customFields) {
@@ -193,6 +205,27 @@ export class CreateTransactionUseCase
 
       return { transaction, customFields: customFieldValuesWithMetadata };
     } catch (error: any) {
+      if (createdTransactionId) {
+        try {
+          await this.transactionCustomFieldRepository.deleteByTransactionId({
+            transaction_id: createdTransactionId,
+            user_id: data.userId,
+          });
+          await this.transactionRepository.delete({
+            id: createdTransactionId,
+            userId: data.userId,
+          });
+        } catch (rollbackError) {
+          logger.error(
+            `Falha ao desfazer criação parcial da transação ${createdTransactionId}: ${
+              rollbackError instanceof Error
+                ? rollbackError.message
+                : String(rollbackError)
+            }`
+          );
+        }
+      }
+
       if (error.name === "ValidationError") {
         throw error;
       }

@@ -151,6 +151,7 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
         );
       }
 
+      const effectiveCategoryId = data.categoryId ?? transaction.category_id;
       if (data.categoryId) {
         const category = await this.categoryRepository.findByIdAndUserId({
           id: data.categoryId,
@@ -163,21 +164,26 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
         }
       }
 
-      if (data?.transactionDate) {
-        const transactionDate = new Date(data.transactionDate);
-        const recordMonth = monthlyRecord.month;
-        const recordYear = monthlyRecord.year;
-        const transactionMonth = transactionDate.getMonth() + 1;
-        const transactionYear = transactionDate.getFullYear();
+      const monthlyRecordCategoryId =
+        monthlyRecord.category?.id ?? monthlyRecord.category_id;
+      if (monthlyRecordCategoryId !== effectiveCategoryId) {
+        throw new BusinessRuleError(
+          "O registro mensal não pertence à categoria informada"
+        );
+      }
 
-        if (
-          transactionMonth !== recordMonth ||
-          transactionYear !== recordYear
-        ) {
-          throw new BusinessRuleError(
-            `A data da transação deve estar dentro do mês ${recordMonth} e ano ${recordYear} do registro mensal`
-          );
-        }
+      const effectiveTransactionDate = new Date(
+        data.transactionDate ?? transaction.transaction_date
+      );
+      const transactionMonth = effectiveTransactionDate.getMonth() + 1;
+      const transactionYear = effectiveTransactionDate.getFullYear();
+      if (
+        transactionMonth !== monthlyRecord.month ||
+        transactionYear !== monthlyRecord.year
+      ) {
+        throw new BusinessRuleError(
+          `A data da transação deve estar dentro do mês ${monthlyRecord.month} e ano ${monthlyRecord.year} do registro mensal`
+        );
       }
 
       const updatedTransaction = await this.transactionRepository.update({
@@ -191,7 +197,7 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
         category_id: data.categoryId,
       });
 
-      if (data?.customFields && data?.customFields?.length > 0) {
+      if (data.customFields !== undefined) {
         await this.transactionCustomFieldRepository.deleteByTransactionId({
           transaction_id: updatedTransaction.id,
           user_id: data.userId,
