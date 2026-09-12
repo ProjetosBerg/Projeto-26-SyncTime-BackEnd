@@ -4,6 +4,8 @@ import { CustomFieldsRepositoryProtocol } from "@/infra/db/interfaces/customFiel
 import { UserRepositoryProtocol } from "@/infra/db/interfaces/userRepositoryProtocol";
 import { DeleteCustomFieldUseCaseProtocol } from "@/data/usecases/interfaces/customFields/deleteCustomFieldUseCaseProtocol";
 import { deleteCustomFieldValidationSchema } from "@/data/usecases/validation/customFields/deleteCustomFieldValidationSchema";
+import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
+import logger from "@/loaders/logger";
 
 /**
  * Exclui um campo personalizado pelo seu ID e ID do usuário
@@ -24,7 +26,8 @@ export class DeleteCustomFieldUseCase
 {
   constructor(
     private readonly customFieldsRepository: CustomFieldsRepositoryProtocol,
-    private readonly userRepository: UserRepositoryProtocol
+    private readonly userRepository: UserRepositoryProtocol,
+    private readonly transactionCustomFieldRepository?: TransactionCustomFieldRepositoryProtocol
   ) {}
 
   async handle(data: DeleteCustomFieldUseCaseProtocol.Params): Promise<void> {
@@ -32,17 +35,19 @@ export class DeleteCustomFieldUseCase
       await deleteCustomFieldValidationSchema.validate(data, {
         abortEarly: false,
       });
+      const userId = String(data.userId);
+      const customFieldsId = String(data.customFieldsId);
 
       const user = await this.userRepository.findOne({
-        id: data.userId,
+        id: userId,
       });
       if (!user) {
         throw new NotFoundError(`Usuário com ID ${data.userId} não encontrado`);
       }
 
       const customField = await this.customFieldsRepository.findByIdAndUserId({
-        id: data.customFieldsId,
-        user_id: data.userId,
+        id: customFieldsId,
+        user_id: userId,
       });
       if (!customField) {
         throw new NotFoundError(
@@ -51,9 +56,24 @@ export class DeleteCustomFieldUseCase
       }
 
       await this.customFieldsRepository.delete({
-        id: data.customFieldsId,
-        user_id: data.userId,
+        id: customFieldsId,
+        user_id: userId,
       });
+
+      try {
+        await this.transactionCustomFieldRepository?.deleteByCustomFieldIds?.({
+          custom_field_ids: [customFieldsId],
+          user_id: userId,
+        });
+      } catch (cleanupError) {
+        logger.error(
+          `Campo customizado ${customFieldsId} excluído, mas seus valores não foram removidos: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }`
+        );
+      }
     } catch (error: any) {
       if (error.name === "ValidationError") {
         throw error;

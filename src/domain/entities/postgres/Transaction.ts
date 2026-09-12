@@ -29,15 +29,24 @@ export class Transaction extends BaseEntity {
   @Column({ type: "date" })
   transaction_date!: Date;
 
-  @ManyToOne(() => MonthlyRecord, (record) => record.id, { nullable: false })
+  @ManyToOne(() => MonthlyRecord, (record) => record.id, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "monthly_record_id" })
   monthly_record!: MonthlyRecord;
 
-  @ManyToOne(() => Category, (category) => category.id, { nullable: false })
+  @ManyToOne(() => Category, (category) => category.id, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "category_id" })
   category!: Category;
 
-  @ManyToOne(() => User, (user) => user.id, { nullable: false })
+  @ManyToOne(() => User, (user) => user.id, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user!: User;
 

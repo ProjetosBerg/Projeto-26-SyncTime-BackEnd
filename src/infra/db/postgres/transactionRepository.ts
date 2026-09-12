@@ -132,10 +132,7 @@ export class TransactionRepository implements TransactionRepositoryProtocol {
       );
     }
 
-    await this.repository.delete({
-      id: data.id,
-      user: { id: data.userId },
-    });
+    await this.repository.remove(transaction);
   }
 
   /**

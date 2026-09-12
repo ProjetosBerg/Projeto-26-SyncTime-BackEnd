@@ -5,6 +5,9 @@ import { CategoryRepositoryProtocol } from "@/infra/db/interfaces/categoryReposi
 import { UserRepositoryProtocol } from "@/infra/db/interfaces/userRepositoryProtocol";
 import { deleteCategoryValidationSchema } from "@/data/usecases/validation/category/deleteCategoryValidationSchema";
 import { DeleteCategoryUseCaseProtocol } from "@/data/usecases/interfaces/category/deleteCategoryUseCaseProtocol";
+import { CustomFieldsRepositoryProtocol } from "@/infra/db/interfaces/customFieldsRepositoryProtocol";
+import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
+import logger from "@/loaders/logger";
 
 /**
  * Exclui uma categoria pelo ID para um usuário específico
@@ -23,7 +26,9 @@ import { DeleteCategoryUseCaseProtocol } from "@/data/usecases/interfaces/catego
 export class DeleteCategoryUseCase implements DeleteCategoryUseCaseProtocol {
   constructor(
     private readonly categoryRepository: CategoryRepositoryProtocol,
-    private readonly userRepository: UserRepositoryProtocol
+    private readonly userRepository: UserRepositoryProtocol,
+    private readonly customFieldsRepository?: CustomFieldsRepositoryProtocol,
+    private readonly transactionCustomFieldRepository?: TransactionCustomFieldRepositoryProtocol
   ) {}
 
   async handle(data: DeleteCategoryUseCaseProtocol.Params): Promise<void> {
@@ -31,18 +36,59 @@ export class DeleteCategoryUseCase implements DeleteCategoryUseCaseProtocol {
       await deleteCategoryValidationSchema.validate(data, {
         abortEarly: false,
       });
+      const userId = String(data.userId);
+      const categoryId = String(data.categoryId);
 
       const user = await this.userRepository.findOne({
-        id: String(data.userId),
+        id: userId,
       });
       if (!user) {
         throw new NotFoundError(`Usuário com ID ${data.userId} não encontrado`);
       }
 
-      await this.categoryRepository.deleteCategory({
-        id: data.categoryId,
-        userId: data.userId,
+      const category = await this.categoryRepository.findByIdAndUserId({
+        id: categoryId,
+        userId,
       });
+      if (!category) {
+        throw new NotFoundError(
+          `Categoria com ID ${data.categoryId} não encontrada para este usuário`
+        );
+      }
+      const transactionIds = (category.transactions || []).map(
+        (transaction) => transaction.id
+      );
+
+      await this.categoryRepository.deleteCategory({
+        id: categoryId,
+        userId,
+      });
+
+      try {
+        const customFieldIds =
+          (await this.customFieldsRepository?.deleteByCategoryId?.({
+            category_id: categoryId,
+            user_id: userId,
+          })) || [];
+        await Promise.all([
+          this.transactionCustomFieldRepository?.deleteByTransactionIds?.({
+            transaction_ids: transactionIds,
+            user_id: userId,
+          }),
+          this.transactionCustomFieldRepository?.deleteByCustomFieldIds?.({
+            custom_field_ids: customFieldIds,
+            user_id: userId,
+          }),
+        ]);
+      } catch (cleanupError) {
+        logger.error(
+          `Categoria ${categoryId} excluída do PostgreSQL, mas houve falha na limpeza do MongoDB: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }`
+        );
+      }
     } catch (error: any) {
       if (error.name === "ValidationError") {
         throw error;

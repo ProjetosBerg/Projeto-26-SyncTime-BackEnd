@@ -7,6 +7,22 @@ import { CustomFieldModel as CustomField } from "@/domain/entities/mongo/CustomF
 import { NotFoundError } from "@/data/errors/NotFoundError";
 
 export class CustomFieldsRepository implements CustomFieldsRepositoryProtocol {
+  private async deleteManyAndReturnIds(
+    filter: Record<string, unknown>
+  ): Promise<string[]> {
+    const fields = await CustomField.find(filter).select({ _id: 1 }).lean();
+    const ids = fields.map((field) => String(field._id));
+
+    if (ids.length > 0) {
+      await CustomField.deleteMany({
+        _id: { $in: ids },
+        ...filter,
+      });
+    }
+
+    return ids;
+  }
+
   async create(
     data: CustomFieldsRepositoryProtocol.CreateCustomFieldParams
   ): Promise<CustomFieldModel> {
@@ -152,5 +168,29 @@ export class CustomFieldsRepository implements CustomFieldsRepositoryProtocol {
         `Campo personalizado com ID ${data.id} não encontrado para este usuário`
       );
     }
+  }
+
+  async deleteByUserId(
+    data: CustomFieldsRepositoryProtocol.DeleteByUserIdParams
+  ): Promise<string[]> {
+    return this.deleteManyAndReturnIds({ user_id: data.user_id });
+  }
+
+  async deleteByCategoryId(
+    data: CustomFieldsRepositoryProtocol.DeleteByCategoryIdParams
+  ): Promise<string[]> {
+    return this.deleteManyAndReturnIds({
+      category_id: data.category_id,
+      user_id: data.user_id,
+    });
+  }
+
+  async deleteByRecordTypeId(
+    data: CustomFieldsRepositoryProtocol.DeleteByRecordTypeIdParams
+  ): Promise<string[]> {
+    return this.deleteManyAndReturnIds({
+      record_type_id: data.record_type_id,
+      user_id: data.user_id,
+    });
   }
 }

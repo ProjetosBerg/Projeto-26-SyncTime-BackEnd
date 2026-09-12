@@ -197,10 +197,7 @@ export class CategoryRepository implements CategoryRepositoryProtocol {
       );
     }
 
-    await this.repository.delete({
-      id: data.id,
-      user: { id: data.userId },
-    });
+    await this.repository.remove(category);
   }
 
   /**

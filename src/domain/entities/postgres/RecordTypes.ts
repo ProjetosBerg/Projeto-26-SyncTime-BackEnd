@@ -15,7 +15,10 @@ export class RecordTypes extends BaseEntity {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @ManyToOne(() => User, (user) => user.id, { nullable: false })
+  @ManyToOne(() => User, (user) => user.id, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user_id!: User;
 

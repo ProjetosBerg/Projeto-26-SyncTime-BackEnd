@@ -23,6 +23,15 @@ export interface CustomFieldsRepositoryProtocol {
     data: CustomFieldsRepositoryProtocol.UpdateParams
   ): Promise<CustomFieldModel>;
   delete(data: CustomFieldsRepositoryProtocol.DeleteParams): Promise<void>;
+  deleteByUserId?(
+    data: CustomFieldsRepositoryProtocol.DeleteByUserIdParams
+  ): Promise<string[]>;
+  deleteByCategoryId?(
+    data: CustomFieldsRepositoryProtocol.DeleteByCategoryIdParams
+  ): Promise<string[]>;
+  deleteByRecordTypeId?(
+    data: CustomFieldsRepositoryProtocol.DeleteByRecordTypeIdParams
+  ): Promise<string[]>;
 }
 
 export namespace CustomFieldsRepositoryProtocol {
@@ -82,5 +91,16 @@ export namespace CustomFieldsRepositoryProtocol {
   export type DeleteParams = {
     id: CustomFieldModel["id"];
     user_id: CustomFieldModel["user_id"];
+  };
+  export type DeleteByUserIdParams = {
+    user_id: string;
+  };
+  export type DeleteByCategoryIdParams = {
+    category_id: string;
+    user_id: string;
+  };
+  export type DeleteByRecordTypeIdParams = {
+    record_type_id: number;
+    user_id: string;
   };
 }

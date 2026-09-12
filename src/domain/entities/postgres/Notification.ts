@@ -39,7 +39,10 @@ export class Notification extends BaseEntity {
   @Column({ type: "varchar", nullable: true })
   typeOfAction?: string;
 
-  @ManyToOne(() => User, (user) => user.notifications, { nullable: false })
+  @ManyToOne(() => User, (user) => user.notifications, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user!: User;
 

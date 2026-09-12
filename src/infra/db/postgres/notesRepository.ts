@@ -254,10 +254,7 @@ export class NotesRepository implements NotesRepositoryProtocol {
       );
     }
 
-    await this.repository.delete({
-      id: data.id,
-      user: { id: data.userId },
-    });
+    await this.repository.remove(note);
   }
 
   /**

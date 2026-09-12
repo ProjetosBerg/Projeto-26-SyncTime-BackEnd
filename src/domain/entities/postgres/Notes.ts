@@ -29,6 +29,7 @@ export class Notes extends BaseEntity {
 
   @ManyToOne(() => Category, (category) => category.notes, {
     nullable: true,
+    onDelete: "CASCADE",
   })
   @JoinColumn({ name: "category_id" })
   category?: Category;
@@ -54,11 +55,17 @@ export class Notes extends BaseEntity {
   @Column("json", { nullable: true })
   comments?: Comment[];
 
-  @ManyToOne(() => Routines, (routine) => routine.notes, { nullable: false })
+  @ManyToOne(() => Routines, (routine) => routine.notes, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "routine_id" })
   routine!: Routines;
 
-  @ManyToOne(() => User, (user) => user.notes, { nullable: false })
+  @ManyToOne(() => User, (user) => user.notes, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user!: User;
 

@@ -27,7 +27,10 @@ export class Routines extends BaseEntity {
   @CreateDateColumn({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   created_at!: Date;
 
-  @ManyToOne(() => User, (user) => user.routines, { nullable: false })
+  @ManyToOne(() => User, (user) => user.routines, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user!: User;
 

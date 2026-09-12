@@ -3,6 +3,9 @@ import { BusinessRuleError } from "@/data/errors/BusinessRuleError";
 import { RecordTypesRepositoryProtocol } from "@/infra/db/interfaces/recordTypesRepositoryProtocol";
 import { deleteRecordTypeValidationSchema } from "@/data/usecases/validation/recordTypes/deleteRecordTypeValidationSchema";
 import { DeleteRecordTypeUseCaseProtocol } from "@/data/usecases/interfaces/recordTypes/deleteRecordTypeUseCaseProtocol";
+import { CustomFieldsRepositoryProtocol } from "@/infra/db/interfaces/customFieldsRepositoryProtocol";
+import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
+import logger from "@/loaders/logger";
 
 /**
  * Exclui um tipo de registro de um usuário específico
@@ -22,7 +25,9 @@ export class DeleteRecordTypeUseCase
   implements DeleteRecordTypeUseCaseProtocol
 {
   constructor(
-    private readonly recordTypeRepository: RecordTypesRepositoryProtocol
+    private readonly recordTypeRepository: RecordTypesRepositoryProtocol,
+    private readonly customFieldsRepository?: CustomFieldsRepositoryProtocol,
+    private readonly transactionCustomFieldRepository?: TransactionCustomFieldRepositoryProtocol
   ) {}
 
   async handle(data: DeleteRecordTypeUseCaseProtocol.Params): Promise<any> {
@@ -30,11 +35,33 @@ export class DeleteRecordTypeUseCase
       await deleteRecordTypeValidationSchema.validate(data, {
         abortEarly: false,
       });
+      const recordTypeId = Number(data.recordTypeId);
+      const userId = String(data.userId);
 
       await this.recordTypeRepository.deleteRecordTypes({
-        id: data.recordTypeId,
-        userId: data.userId,
+        id: recordTypeId,
+        userId,
       });
+
+      try {
+        const customFieldIds =
+          (await this.customFieldsRepository?.deleteByRecordTypeId?.({
+            record_type_id: recordTypeId,
+            user_id: userId,
+          })) || [];
+        await this.transactionCustomFieldRepository?.deleteByCustomFieldIds?.({
+          custom_field_ids: customFieldIds,
+          user_id: userId,
+        });
+      } catch (cleanupError) {
+        logger.error(
+          `Tipo de registro ${recordTypeId} excluído do PostgreSQL, mas houve falha na limpeza do MongoDB: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }`
+        );
+      }
     } catch (error: any) {
       if (error.name === "ValidationError") {
         throw error;

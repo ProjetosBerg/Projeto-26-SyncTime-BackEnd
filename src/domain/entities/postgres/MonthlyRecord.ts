@@ -39,11 +39,17 @@ export class MonthlyRecord extends BaseEntity {
   @Column({ type: "varchar", length: 255 })
   status!: string;
 
-  @ManyToOne(() => Category, (category) => category.id, { nullable: false })
+  @ManyToOne(() => Category, (category) => category.id, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "category_id" })
   category!: Category;
 
-  @ManyToOne(() => User, (user) => user.id, { nullable: false })
+  @ManyToOne(() => User, (user) => user.id, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user!: User;
 

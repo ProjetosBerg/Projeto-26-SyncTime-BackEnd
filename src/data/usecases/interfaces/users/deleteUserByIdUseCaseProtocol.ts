@@ -13,5 +13,6 @@ export namespace DeleteUserByIdUseCaseProtocol {
   };
   export type Result = {
     message: string;
+    deletedAvatarPublicId?: string;
   };
 }

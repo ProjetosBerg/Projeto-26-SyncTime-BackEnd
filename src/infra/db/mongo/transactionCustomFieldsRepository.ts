@@ -49,4 +49,34 @@ export class TransactionCustomFieldRepository
       );
     }
   }
+
+  async deleteByTransactionIds(
+    data: TransactionCustomFieldRepositoryProtocol.DeleteByTransactionIdsParams
+  ): Promise<void> {
+    if (data.transaction_ids.length === 0) return;
+
+    await TransactionCustomFieldValueModel.deleteMany({
+      transaction_id: { $in: data.transaction_ids },
+      user_id: data.user_id,
+    });
+  }
+
+  async deleteByCustomFieldIds(
+    data: TransactionCustomFieldRepositoryProtocol.DeleteByCustomFieldIdsParams
+  ): Promise<void> {
+    if (data.custom_field_ids.length === 0) return;
+
+    await TransactionCustomFieldValueModel.deleteMany({
+      custom_field_id: { $in: data.custom_field_ids },
+      user_id: data.user_id,
+    });
+  }
+
+  async deleteByUserId(
+    data: TransactionCustomFieldRepositoryProtocol.DeleteByUserIdParams
+  ): Promise<void> {
+    await TransactionCustomFieldValueModel.deleteMany({
+      user_id: data.user_id,
+    });
+  }
 }

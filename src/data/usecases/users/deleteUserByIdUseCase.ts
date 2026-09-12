@@ -4,9 +4,16 @@ import { BusinessRuleError } from "@/data/errors/BusinessRuleError";
 import { NotFoundError } from "@/data/errors/NotFoundError";
 import { DeleteUserByIdUseCaseProtocol } from "../interfaces/users/deleteUserByIdUseCaseProtocol";
 import { deleteUserByIdValidationSchema } from "../validation/users/deleteUserByIdValidationSchema";
+import { CustomFieldsRepositoryProtocol } from "@/infra/db/interfaces/customFieldsRepositoryProtocol";
+import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
+import logger from "@/loaders/logger";
 
 export class DeleteUserByIdUseCase implements DeleteUserByIdUseCaseProtocol {
-  constructor(private readonly userRepository: UserRepositoryProtocol) {}
+  constructor(
+    private readonly userRepository: UserRepositoryProtocol,
+    private readonly customFieldsRepository?: CustomFieldsRepositoryProtocol,
+    private readonly transactionCustomFieldRepository?: TransactionCustomFieldRepositoryProtocol
+  ) {}
 
   /**
    * Deleta um usuário específico pelo seu ID
@@ -25,15 +32,36 @@ export class DeleteUserByIdUseCase implements DeleteUserByIdUseCaseProtocol {
       await deleteUserByIdValidationSchema.validate(data, {
         abortEarly: false,
       });
+      const userId = String(data.id);
 
-      const user = await this.userRepository.findOne({ id: data?.id });
+      const user = await this.userRepository.findOne({ id: userId });
       if (!user) {
         throw new NotFoundError("Usuário não encontrado");
       }
 
-      await this.userRepository.deleteUser({ id: data?.id });
+      await this.userRepository.deleteUser({ id: userId });
 
-      return { message: "Usuário deletado com sucesso" };
+      try {
+        await Promise.all([
+          this.transactionCustomFieldRepository?.deleteByUserId?.({
+            user_id: userId,
+          }),
+          this.customFieldsRepository?.deleteByUserId?.({ user_id: userId }),
+        ]);
+      } catch (cleanupError) {
+        logger.error(
+          `Usuário ${userId} excluído do PostgreSQL, mas houve falha na limpeza do MongoDB: ${
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+          }`
+        );
+      }
+
+      return {
+        message: "Usuário deletado com sucesso",
+        deletedAvatarPublicId: user.publicId,
+      };
     } catch (error: any) {
       if (error.name === "ValidationError") {
         throw error;

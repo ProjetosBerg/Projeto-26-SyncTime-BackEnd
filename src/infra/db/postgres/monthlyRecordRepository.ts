@@ -296,10 +296,7 @@ export class MonthlyRecordRepository
       );
     }
 
-    await this.repository.delete({
-      id: data.id,
-      user: { id: data.userId },
-    });
+    await this.repository.remove(monthlyRecord);
   }
 
   private getOperatorValue(operator: string, value: any, value2?: any): any {

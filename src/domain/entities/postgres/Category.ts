@@ -31,11 +31,15 @@ export class Category extends BaseEntity {
 
   @ManyToOne(() => RecordTypes, (recordType) => recordType.id, {
     nullable: false,
+    onDelete: "CASCADE",
   })
   @JoinColumn({ name: "record_type_id" })
   record_type!: RecordTypes;
 
-  @ManyToOne(() => User, (user) => user.id, { nullable: false })
+  @ManyToOne(() => User, (user) => user.id, {
+    nullable: false,
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "user_id" })
   user!: User;
 

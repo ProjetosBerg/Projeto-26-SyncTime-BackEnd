@@ -195,9 +195,6 @@ export class RecordTypeRepository implements RecordTypesRepositoryProtocol {
       );
     }
 
-    await this.repository.delete({
-      id: data.id,
-      user_id: { id: data.userId },
-    });
+    await this.repository.remove(recordType);
   }
 }
