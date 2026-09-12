@@ -121,43 +121,56 @@ export class GetByUserIdTransactionUseCase
         fieldTypes = { ...fieldTypes, ...customFieldTypes };
       }
 
-      const enrichedTransactions = await Promise.all(
-        transactions.map(async (transaction) => {
-          const customFieldValues =
-            await this.transactionCustomFieldRepository.findByTransactionId({
-              transaction_id: transaction.id,
-              user_id: data.userId,
-            });
-
-          let enrichedCustomFields: CustomFieldValueWithMetadata[] = [];
-          if (customFieldValues.length > 0) {
-            enrichedCustomFields = customFieldValues.map((value) => {
-              const cfDef = customFieldDefs.find(
-                (cf) => cf.id === value.custom_field_id
-              );
-              if (!cfDef) {
-                throw new ServerError(
-                  `Definição de campo customizado não encontrada para ID ${value.custom_field_id}`
-                );
-              }
-              return {
-                id: value.id!,
-                custom_field_id: value.custom_field_id!,
-                value: value.value,
-                label: cfDef.label,
-                type: cfDef.type,
-                required: cfDef.required,
-              };
-            });
-          }
-
-          return {
-            transaction,
-            customFields: enrichedCustomFields,
-            recordTypeId,
-          };
-        })
+      const customFieldDefsById = new Map(
+        customFieldDefs.map((definition) => [definition.id, definition])
       );
+      const allCustomFieldValues =
+        await this.transactionCustomFieldRepository.findByTransactionIds({
+          transaction_ids: transactions.map((transaction) => transaction.id),
+          user_id: data.userId!,
+        });
+      const customFieldValuesByTransactionId = new Map<
+        string,
+        typeof allCustomFieldValues
+      >();
+
+      for (const value of allCustomFieldValues) {
+        const transactionId = value.transaction_id;
+        const transactionValues =
+          customFieldValuesByTransactionId.get(transactionId) || [];
+        transactionValues.push(value);
+        customFieldValuesByTransactionId.set(transactionId, transactionValues);
+      }
+
+      const enrichedTransactions = transactions.map((transaction) => {
+        const customFieldValues =
+          customFieldValuesByTransactionId.get(transaction.id) || [];
+        let enrichedCustomFields: CustomFieldValueWithMetadata[] = [];
+        if (customFieldValues.length > 0) {
+          enrichedCustomFields = customFieldValues.map((value) => {
+            const cfDef = customFieldDefsById.get(value.custom_field_id);
+            if (!cfDef) {
+              throw new ServerError(
+                `Definição de campo customizado não encontrada para ID ${value.custom_field_id}`
+              );
+            }
+            return {
+              id: value.id!,
+              custom_field_id: value.custom_field_id!,
+              value: value.value,
+              label: cfDef.label,
+              type: cfDef.type,
+              required: cfDef.required,
+            };
+          });
+        }
+
+        return {
+          transaction,
+          customFields: enrichedCustomFields,
+          recordTypeId,
+        };
+      });
 
       let result = enrichedTransactions;
 
@@ -166,9 +179,7 @@ export class GetByUserIdTransactionUseCase
           const customMap: Record<string, string> = {};
           if (enriched.customFields && enriched.customFields.length > 0) {
             enriched.customFields.forEach((cf) => {
-              const def = customFieldDefs.find(
-                (d) => d.id === cf.custom_field_id
-              );
+              const def = customFieldDefsById.get(cf.custom_field_id);
               if (def) {
                 const mapVal = Array.isArray(cf.value)
                   ? cf.value.join(", ")
@@ -205,9 +216,7 @@ export class GetByUserIdTransactionUseCase
           const customMap: Record<string, string> = {};
           if (enriched.customFields && enriched.customFields.length > 0) {
             enriched.customFields.forEach((cf) => {
-              const def = customFieldDefs.find(
-                (d) => d.id === cf.custom_field_id
-              );
+              const def = customFieldDefsById.get(cf.custom_field_id);
               if (def) {
                 const mapVal = Array.isArray(cf.value)
                   ? cf.value.join(", ")

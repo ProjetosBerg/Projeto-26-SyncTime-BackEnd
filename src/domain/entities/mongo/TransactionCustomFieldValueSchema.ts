@@ -46,6 +46,8 @@ TransactionCustomFieldValueSchema.pre("save", function (next) {
   next();
 });
 
+TransactionCustomFieldValueSchema.index({ user_id: 1, transaction_id: 1 });
+
 export const TransactionCustomFieldValueModel = model(
   "transaction_custom_field_values",
   TransactionCustomFieldValueSchema

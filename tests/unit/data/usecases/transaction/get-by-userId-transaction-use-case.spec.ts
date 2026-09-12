@@ -11,7 +11,6 @@ import { GetByUserIdTransactionUseCase } from "@/data/usecases/transactions/getB
 import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
 import { mockCustomField } from "@/tests/unit/mocks/customFields/mockCustomFields";
 import { CustomFieldsRepositoryProtocol } from "@/infra/db/interfaces/customFieldsRepositoryProtocol";
-import { tr } from "@faker-js/faker";
 import { CategoryRepositoryProtocol } from "@/infra/db/interfaces/categoryRepositoryProtocol";
 import { mockCategory } from "@/tests/unit/mocks/category/mockCategory";
 import { mockCustomFieldMultiple } from "@/tests/unit/mocks/customFields/mockCustomFieldMultiple";
@@ -59,6 +58,7 @@ export const makeTransactionCustomFieldsRepository =
     findByIdAndUserId: jest.fn().mockResolvedValue(mockTransaction),
     update: jest.fn().mockResolvedValue(mockTransaction),
     findByTransactionId: jest.fn().mockResolvedValue([]),
+    findByTransactionIds: jest.fn().mockResolvedValue([]),
     findByIdsAndUserId: jest.fn().mockResolvedValue([mockCustomField]),
     deleteByTransactionId: jest.fn().mockResolvedValue(undefined),
     ...({} as any),
@@ -94,6 +94,7 @@ const makeSut = () => {
     transactionRepositorySpy,
     userRepositorySpy,
     monthlyRecordRepositorySpy,
+    transactionCustomFieldsRepositorySpy,
   };
 };
 
@@ -108,6 +109,7 @@ describe("GetByUserIdTransactionUseCase", () => {
       transactionRepositorySpy,
       userRepositorySpy,
       monthlyRecordRepositorySpy,
+      transactionCustomFieldsRepositorySpy,
     } = makeSut();
     userRepositorySpy.findOne.mockResolvedValue(mockUser);
     monthlyRecordRepositorySpy.findByIdAndUserId.mockResolvedValue(
@@ -157,6 +159,15 @@ describe("GetByUserIdTransactionUseCase", () => {
     expect(
       transactionRepositorySpy.findByUserIdAndMonthlyRecordId
     ).toHaveBeenCalledTimes(1);
+    expect(
+      transactionCustomFieldsRepositorySpy.findByTransactionIds
+    ).toHaveBeenCalledWith({
+      transaction_ids: [mockTransaction.id],
+      user_id: input.userId,
+    });
+    expect(
+      transactionCustomFieldsRepositorySpy.findByTransactionId
+    ).not.toHaveBeenCalled();
   });
 
   test("should return empty array if no transactions are found", async () => {

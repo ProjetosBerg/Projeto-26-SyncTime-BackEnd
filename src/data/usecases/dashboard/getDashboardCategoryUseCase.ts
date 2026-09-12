@@ -183,81 +183,97 @@ export class GetDashboardCategoryUseCase
     userId: string
   ): Promise<DashboardData["detailedData"]> {
     const detailedData: DashboardData["detailedData"] = [];
-    for (const category of categories) {
-      const { customFields: customFieldDefs } =
-        await this.customFieldRepository.findByRecordTypeId({
-          record_type_id: category!.record_type_id,
-          category_id: category!.id,
-          user_id: userId,
-        });
-      const categoryRecords = monthlyRecords.filter(
-        (r) => r.category_id === category!.id
-      );
-      const enrichedRecords = await Promise.all(
-        categoryRecords.map(async (record) => {
-          const transactions = record.transactions || [];
-          const enrichedTransactions = await Promise.all(
-            transactions.map(async (transaction: any) => {
-              const customFieldValues =
-                await this.transactionCustomFieldRepository.findByTransactionId(
-                  {
-                    transaction_id: transaction.id,
-                    user_id: userId,
-                  }
-                );
-              let customFields: any[] = [];
-              if (customFieldValues.length > 0) {
-                customFields = customFieldValues.map((value) => {
-                  const cfDef = customFieldDefs.find(
-                    (cf) => cf.id === value.custom_field_id
-                  );
-                  return {
-                    label: cfDef?.label || "Unknown",
-                    value: value.value,
-                    type: cfDef?.type || "text",
-                  };
-                });
-              }
-              return {
-                id: transaction.id,
-                title: transaction.title,
-                description: transaction.description,
-                amount: this.toFiniteNumber(transaction.amount),
-                transactionDate: transaction.transaction_date,
-                customFields:
-                  customFields.length > 0 ? customFields : undefined,
-              };
-            })
-          );
-          const amounts = enrichedTransactions.map((t) => t.amount);
-          const dates = enrichedTransactions
-            .map((t) => t.transactionDate)
-            .sort();
-          return {
-            id: record.id,
-            title: record.title,
-            description: record.description,
-            goal: record.goal,
-            initialBalance: this.toFiniteNumber(record.initial_balance),
-            month: record.month,
-            year: record.year,
-            status: record.status,
-            transactionsSummary: {
-              count: enrichedTransactions.length,
-              totalAmount: amounts.reduce((sum, a) => sum + a, 0),
-              averageAmount:
-                amounts.length > 0
-                  ? amounts.reduce((sum, a) => sum + a, 0) / amounts.length
-                  : 0,
-              minAmount: amounts.length > 0 ? Math.min(...amounts) : 0,
-              maxAmount: amounts.length > 0 ? Math.max(...amounts) : 0,
-              firstTransactionDate: dates[0] || null,
-              lastTransactionDate: dates[dates.length - 1] || null,
-            },
-            transactions: enrichedTransactions,
-          };
+    const transactionIds = monthlyRecords.flatMap((record) =>
+      (record.transactions || []).map((transaction: any) => transaction.id)
+    );
+    const [customFieldsByCategory, allCustomFieldValues] = await Promise.all([
+      Promise.all(
+        categories.map(async (category) => {
+          const { customFields } =
+            await this.customFieldRepository.findByRecordTypeId({
+              record_type_id: category!.record_type_id,
+              category_id: category!.id,
+              user_id: userId,
+            });
+          return [category!.id, customFields] as const;
         })
+      ),
+      this.transactionCustomFieldRepository.findByTransactionIds({
+        transaction_ids: transactionIds,
+        user_id: userId,
+      }),
+    ]);
+    const customFieldsByCategoryId = new Map(customFieldsByCategory);
+    const customFieldValuesByTransactionId = new Map<string, any[]>();
+
+    for (const value of allCustomFieldValues) {
+      const values =
+        customFieldValuesByTransactionId.get(value.transaction_id) || [];
+      values.push(value);
+      customFieldValuesByTransactionId.set(value.transaction_id, values);
+    }
+
+    for (const category of categories) {
+      const customFieldDefs = customFieldsByCategoryId.get(category!.id) || [];
+      const customFieldDefsById = new Map(
+        customFieldDefs.map((definition) => [definition.id, definition])
       );
+      const categoryRecords = monthlyRecords.filter(
+        (record) => record.category_id === category!.id
+      );
+      const enrichedRecords = categoryRecords.map((record) => {
+        const transactions = record.transactions || [];
+        const enrichedTransactions = transactions.map((transaction: any) => {
+          const customFieldValues =
+            customFieldValuesByTransactionId.get(transaction.id) || [];
+          const customFields = customFieldValues.map((value) => {
+            const cfDef = customFieldDefsById.get(value.custom_field_id);
+            return {
+              label: cfDef?.label || "Unknown",
+              value: value.value,
+              type: cfDef?.type || "text",
+            };
+          });
+          return {
+            id: transaction.id,
+            title: transaction.title,
+            description: transaction.description,
+            amount: this.toFiniteNumber(transaction.amount),
+            transactionDate: transaction.transaction_date,
+            customFields: customFields.length > 0 ? customFields : undefined,
+          };
+        });
+        const amounts = enrichedTransactions.map(
+          (transaction) => transaction.amount
+        );
+        const dates = enrichedTransactions
+          .map((transaction) => transaction.transactionDate)
+          .sort();
+        return {
+          id: record.id,
+          title: record.title,
+          description: record.description,
+          goal: record.goal,
+          initialBalance: this.toFiniteNumber(record.initial_balance),
+          month: record.month,
+          year: record.year,
+          status: record.status,
+          transactionsSummary: {
+            count: enrichedTransactions.length,
+            totalAmount: amounts.reduce((sum, amount) => sum + amount, 0),
+            averageAmount:
+              amounts.length > 0
+                ? amounts.reduce((sum, amount) => sum + amount, 0) /
+                  amounts.length
+                : 0,
+            minAmount: amounts.length > 0 ? Math.min(...amounts) : 0,
+            maxAmount: amounts.length > 0 ? Math.max(...amounts) : 0,
+            firstTransactionDate: dates[0] || null,
+            lastTransactionDate: dates[dates.length - 1] || null,
+          },
+          transactions: enrichedTransactions,
+        };
+      });
       detailedData.push({
         category: {
           id: category!.id,

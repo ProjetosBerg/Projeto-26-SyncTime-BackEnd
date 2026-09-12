@@ -100,6 +100,9 @@ export const makeTransactionCustomFieldRepository =
     findByTransactionId: jest
       .fn()
       .mockResolvedValue([mockTransactionCustomFieldValue]),
+    findByTransactionIds: jest
+      .fn()
+      .mockResolvedValue([mockTransactionCustomFieldValue]),
     ...({} as any),
   });
 
@@ -143,6 +146,7 @@ describe("GetDashboardCategoryUseCase", () => {
       userRepositorySpy,
       categoryRepositorySpy,
       monthlyRecordRepositorySpy,
+      transactionCustomFieldRepositorySpy,
     } = makeSut();
     const input = { userId: String(mockUser.id) };
 
@@ -170,6 +174,15 @@ describe("GetDashboardCategoryUseCase", () => {
     });
     expect(categoryRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
     expect(monthlyRecordRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
+    expect(
+      transactionCustomFieldRepositorySpy.findByTransactionIds
+    ).toHaveBeenCalledWith({
+      transaction_ids: ["transaction-1", "transaction-2"],
+      user_id: mockUser.id,
+    });
+    expect(
+      transactionCustomFieldRepositorySpy.findByTransactionId
+    ).not.toHaveBeenCalled();
   });
 
   test("should return dashboard data for specific category when categoryId is provided", async () => {

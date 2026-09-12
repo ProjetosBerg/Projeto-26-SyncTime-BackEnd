@@ -7,6 +7,9 @@ export interface TransactionCustomFieldRepositoryProtocol {
   findByTransactionId(
     data: TransactionCustomFieldRepositoryProtocol.FindByTransactionIdParams
   ): Promise<TransactionCustomFieldValueModel[]>;
+  findByTransactionIds(
+    data: TransactionCustomFieldRepositoryProtocol.FindByTransactionIdsParams
+  ): Promise<TransactionCustomFieldValueModel[]>;
   deleteByTransactionId(
     data: TransactionCustomFieldRepositoryProtocol.DeleteByTransactionIdParams
   ): Promise<void>;
@@ -35,6 +38,10 @@ export namespace TransactionCustomFieldRepositoryProtocol {
   export type FindByTransactionIdParams = {
     transaction_id: string;
     user_id?: string;
+  };
+  export type FindByTransactionIdsParams = {
+    transaction_ids: string[];
+    user_id: string;
   };
 
   export type DeleteByTransactionIdParams = {

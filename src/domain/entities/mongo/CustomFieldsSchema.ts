@@ -94,6 +94,12 @@ CustomFieldSchema.pre("save", function (next) {
   next();
 });
 
+CustomFieldSchema.index({
+  user_id: 1,
+  category_id: 1,
+  record_type_id: 1,
+});
+
 export const CustomFieldModel = model("custom_fields", CustomFieldSchema);
 
 export const TransactionCustomFieldValueModel = model(

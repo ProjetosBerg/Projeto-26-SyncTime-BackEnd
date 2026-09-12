@@ -34,6 +34,17 @@ export class TransactionCustomFieldRepository
     return customFieldValues;
   }
 
+  async findByTransactionIds(
+    data: TransactionCustomFieldRepositoryProtocol.FindByTransactionIdsParams
+  ): Promise<TransactionCustomFieldModel[]> {
+    if (data.transaction_ids.length === 0) return [];
+
+    return TransactionCustomFieldValueModel.find({
+      transaction_id: { $in: data.transaction_ids },
+      user_id: data.user_id,
+    }).lean();
+  }
+
   async deleteByTransactionId(
     data: TransactionCustomFieldRepositoryProtocol.DeleteByTransactionIdParams
   ): Promise<void> {
