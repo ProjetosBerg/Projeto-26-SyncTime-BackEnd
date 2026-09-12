@@ -65,6 +65,15 @@ export const makeTransactionCustomFieldsRepository =
     findByTransactionId: jest.fn().mockResolvedValue([]),
     findByIdsAndUserId: jest.fn().mockResolvedValue([mockCustomField]),
     deleteByTransactionId: jest.fn().mockResolvedValue(undefined),
+    replaceByTransactionId: jest.fn().mockImplementation(async (data) =>
+      data.values.map((field, index) => ({
+        id: `value-${index}`,
+        transaction_id: data.transaction_id,
+        custom_field_id: field.custom_field_id,
+        value: field.value,
+        user_id: data.user_id,
+      }))
+    ),
     ...({} as any),
   });
 
@@ -102,6 +111,8 @@ const makeSut = () => {
     userRepositorySpy,
     categoryRepositorySpy,
     monthlyRecordRepositorySpy,
+    customFieldsRepositorySpy,
+    transactionCustomFieldsRepositorySpy,
   };
 };
 
@@ -117,6 +128,7 @@ describe("EditTransactionUseCase", () => {
       userRepositorySpy,
       categoryRepositorySpy,
       monthlyRecordRepositorySpy,
+      transactionCustomFieldsRepositorySpy,
     } = makeSut();
     userRepositorySpy.findOne.mockResolvedValue(mockUser);
     transactionRepositorySpy.findByIdAndUserId.mockResolvedValue(
@@ -178,6 +190,73 @@ describe("EditTransactionUseCase", () => {
       userId: input.userId,
     });
     expect(transactionRepositorySpy.update).toHaveBeenCalledTimes(1);
+    expect(
+      transactionCustomFieldsRepositorySpy.replaceByTransactionId
+    ).toHaveBeenCalledWith({
+      transaction_id: mockUpdatedTransaction.id,
+      user_id: input.userId,
+      values: [],
+    });
+  });
+
+  test("should restore the transaction and custom fields when MongoDB update fails", async () => {
+    const {
+      sut,
+      transactionRepositorySpy,
+      transactionCustomFieldsRepositorySpy,
+    } = makeSut();
+    const previousCustomFieldValue = {
+      id: "value-old",
+      transaction_id: mockTransaction.id,
+      custom_field_id: mockCustomField.id,
+      value: "old value",
+      user_id: mockUser.id,
+    };
+    transactionCustomFieldsRepositorySpy.findByTransactionId.mockResolvedValue([
+      previousCustomFieldValue,
+    ]);
+    (transactionCustomFieldsRepositorySpy.replaceByTransactionId as jest.Mock)
+      .mockRejectedValueOnce(new Error("MongoDB unavailable"))
+      .mockResolvedValueOnce([previousCustomFieldValue]);
+
+    const input = {
+      transactionId: mockTransaction.id,
+      userId: mockUser.id,
+      title: "New title",
+      categoryId: mockCategory.id,
+      customFields: [
+        {
+          custom_field_id: mockCustomField.id,
+          value: "new value",
+        },
+      ],
+    };
+
+    await expect(sut.handle(input)).rejects.toThrow(ServerError);
+
+    expect(transactionRepositorySpy.update).toHaveBeenCalledTimes(2);
+    expect(transactionRepositorySpy.update).toHaveBeenLastCalledWith({
+      id: mockTransaction.id,
+      userId: mockUser.id,
+      title: mockTransaction.title,
+      description: mockTransaction.description,
+      amount: mockTransaction.amount,
+      transaction_date: mockTransaction.transaction_date,
+      monthly_record_id: mockTransaction.monthly_record_id,
+      category_id: mockTransaction.category_id,
+    });
+    expect(
+      transactionCustomFieldsRepositorySpy.replaceByTransactionId
+    ).toHaveBeenLastCalledWith({
+      transaction_id: mockTransaction.id,
+      user_id: mockUser.id,
+      values: [
+        {
+          custom_field_id: mockCustomField.id,
+          value: previousCustomFieldValue.value,
+        },
+      ],
+    });
   });
 
   test("should update a transaction with minimal fields", async () => {

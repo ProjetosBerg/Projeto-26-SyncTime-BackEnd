@@ -10,6 +10,9 @@ export interface TransactionCustomFieldRepositoryProtocol {
   deleteByTransactionId(
     data: TransactionCustomFieldRepositoryProtocol.DeleteByTransactionIdParams
   ): Promise<void>;
+  replaceByTransactionId(
+    data: TransactionCustomFieldRepositoryProtocol.ReplaceByTransactionIdParams
+  ): Promise<TransactionCustomFieldValueModel[]>;
   deleteByTransactionIds?(
     data: TransactionCustomFieldRepositoryProtocol.DeleteByTransactionIdsParams
   ): Promise<void>;
@@ -37,6 +40,14 @@ export namespace TransactionCustomFieldRepositoryProtocol {
   export type DeleteByTransactionIdParams = {
     transaction_id: string;
     user_id?: string;
+  };
+  export type ReplaceByTransactionIdParams = {
+    transaction_id: string;
+    user_id: string;
+    values: Array<{
+      custom_field_id: string;
+      value: any;
+    }>;
   };
   export type DeleteByTransactionIdsParams = {
     transaction_ids: string[];

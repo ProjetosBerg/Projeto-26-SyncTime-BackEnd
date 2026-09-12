@@ -51,6 +51,7 @@ export const makeCustomFieldsRepository =
   (): jest.Mocked<CustomFieldsRepositoryProtocol> => ({
     create: jest.fn().mockResolvedValue(mockCustomField),
     findByNameAndUserId: jest.fn().mockResolvedValue(null),
+    findByIdsAndUserId: jest.fn().mockResolvedValue([mockCustomField]),
     ...({} as any),
   });
 export const makeTransactionCustomFieldsRepository =
@@ -61,6 +62,15 @@ export const makeTransactionCustomFieldsRepository =
     update: jest.fn().mockResolvedValue(mockTransaction),
     findByTransactionId: jest.fn().mockResolvedValue([mockCustomField]),
     deleteByTransactionId: jest.fn().mockResolvedValue(undefined),
+    replaceByTransactionId: jest.fn().mockImplementation(async (data) =>
+      data.values.map((field, index) => ({
+        id: `value-${index}`,
+        transaction_id: data.transaction_id,
+        custom_field_id: field.custom_field_id,
+        value: field.value,
+        user_id: data.user_id,
+      }))
+    ),
     ...({} as any),
   });
 
@@ -87,6 +97,8 @@ const makeSut = () => {
     userRepositorySpy,
     categoryRepositorySpy,
     monthlyRecordRepositorySpy,
+    customFieldsRepositorySpy,
+    transactionCustomFieldsRepositorySpy,
   };
 };
 
@@ -153,6 +165,42 @@ describe("CreateTransactionUseCase", () => {
       user_id: input.userId,
     });
     expect(transactionRepositorySpy.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("should persist custom fields in one replacement operation", async () => {
+    const { sut, transactionCustomFieldsRepositorySpy } = makeSut();
+    const input = {
+      title: "teste",
+      description: "teste",
+      amount: 150.75,
+      transactionDate: new Date("2025-07-02"),
+      monthlyRecordId: mockMonthlyRecord.id,
+      categoryId: mockCategory.id,
+      userId: mockUser.id,
+      customFields: [
+        {
+          custom_field_id: mockCustomField.id,
+          value: "custom value",
+        },
+      ],
+    };
+
+    const result = await sut.handle(input);
+
+    expect(
+      transactionCustomFieldsRepositorySpy.replaceByTransactionId
+    ).toHaveBeenCalledWith({
+      transaction_id: mockTransaction.id,
+      user_id: input.userId,
+      values: input.customFields,
+    });
+    expect(result.customFields).toEqual([
+      expect.objectContaining({
+        custom_field_id: mockCustomField.id,
+        value: "custom value",
+        label: mockCustomField.label,
+      }),
+    ]);
   });
 
   test("should throw ValidationError if title is empty", async () => {

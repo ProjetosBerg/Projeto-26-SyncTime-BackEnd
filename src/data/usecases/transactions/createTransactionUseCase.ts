@@ -70,6 +70,12 @@ export class CreateTransactionUseCase
         const customFieldIds = data.customFields.map(
           (cf) => cf.custom_field_id
         );
+        if (new Set(customFieldIds).size !== customFieldIds.length) {
+          throw new BusinessRuleError(
+            "Não é permitido informar o mesmo campo customizado mais de uma vez"
+          );
+        }
+
         customFields = await this.customFieldRepository.findByIdsAndUserId({
           ids: customFieldIds,
           user_id: data.userId,
@@ -176,18 +182,16 @@ export class CreateTransactionUseCase
       createdTransactionId = transaction.id;
 
       if (data.customFields && data.customFields.length > 0) {
-        for (const cfValue of data.customFields) {
-          const savedValue = await this.transactionCustomFieldRepository.create(
-            {
-              transaction_id: transaction.id,
-              custom_field_id: cfValue.custom_field_id,
-              value: cfValue.value,
-              user_id: data.userId,
-            }
-          );
+        const savedValues =
+          await this.transactionCustomFieldRepository.replaceByTransactionId({
+            transaction_id: transaction.id,
+            user_id: data.userId!,
+            values: data.customFields,
+          });
 
+        for (const savedValue of savedValues) {
           const cf = customFields!.find(
-            (c) => c.id === cfValue.custom_field_id
+            (field) => field.id === savedValue.custom_field_id
           );
           if (cf) {
             customFieldValuesWithMetadata = customFieldValuesWithMetadata || [];

@@ -13,6 +13,8 @@ import { FieldType } from "@/domain/entities/mongo/CustomFieldsSchema";
 import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
 import { validateFieldValueByType } from "./utils/validateFieldValueByType";
 import { CustomFieldValueWithMetadata } from "./utils/customFieldValueWithMetadata";
+import { TransactionCustomFieldValueModel } from "@/domain/models/mongo/TransactionCustomFieldValueModel";
+import logger from "@/loaders/logger";
 
 /**
  * Atualiza uma transação existente para um usuário específico
@@ -46,6 +48,18 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
     private readonly transactionCustomFieldRepository: TransactionCustomFieldRepositoryProtocol
   ) {}
 
+  private async replaceCustomFieldValues(
+    transactionId: string,
+    userId: string,
+    values: Array<{ custom_field_id: string; value: any }>
+  ): Promise<TransactionCustomFieldValueModel[]> {
+    return this.transactionCustomFieldRepository.replaceByTransactionId({
+      transaction_id: transactionId,
+      user_id: userId,
+      values,
+    });
+  }
+
   async handle(data: EditTransactionUseCaseProtocol.Params): Promise<{
     transaction: TransactionModelMock;
     customFields?: CustomFieldValueWithMetadata[];
@@ -75,6 +89,12 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
         const customFieldIds = data.customFields.map(
           (cf) => cf.custom_field_id
         );
+        if (new Set(customFieldIds).size !== customFieldIds.length) {
+          throw new BusinessRuleError(
+            "Não é permitido informar o mesmo campo customizado mais de uma vez"
+          );
+        }
+
         customFields = await this.customFieldRepository.findByIdsAndUserId({
           ids: customFieldIds,
           user_id: data.userId,
@@ -186,6 +206,14 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
         );
       }
 
+      const previousCustomFieldValues =
+        data.customFields !== undefined
+          ? await this.transactionCustomFieldRepository.findByTransactionId({
+              transaction_id: transaction.id,
+              user_id: data.userId,
+            })
+          : undefined;
+
       const updatedTransaction = await this.transactionRepository.update({
         id: data.transactionId,
         userId: data.userId,
@@ -197,27 +225,64 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
         category_id: data.categoryId,
       });
 
-      if (data.customFields !== undefined) {
-        await this.transactionCustomFieldRepository.deleteByTransactionId({
-          transaction_id: updatedTransaction.id,
-          user_id: data.userId,
-        });
-
-        for (const cf of data.customFields) {
-          await this.transactionCustomFieldRepository.create({
-            transaction_id: updatedTransaction.id,
-            custom_field_id: cf.custom_field_id,
-            value: cf.value,
-            user_id: data.userId,
+      let currentCustomFieldValues: TransactionCustomFieldValueModel[];
+      try {
+        currentCustomFieldValues =
+          data.customFields !== undefined
+            ? await this.replaceCustomFieldValues(
+                updatedTransaction.id,
+                data.userId!,
+                data.customFields
+              )
+            : await this.transactionCustomFieldRepository.findByTransactionId({
+                transaction_id: updatedTransaction.id,
+                user_id: data.userId,
+              });
+      } catch (customFieldError) {
+        try {
+          await this.transactionRepository.update({
+            id: transaction.id,
+            userId: data.userId,
+            title: transaction.title,
+            description: transaction.description,
+            amount: transaction.amount,
+            transaction_date: transaction.transaction_date,
+            monthly_record_id: transaction.monthly_record_id,
+            category_id: transaction.category_id,
           });
+        } catch (rollbackError) {
+          logger.error(
+            `Falha ao restaurar a transação ${transaction.id} no PostgreSQL: ${
+              rollbackError instanceof Error
+                ? rollbackError.message
+                : String(rollbackError)
+            }`
+          );
         }
-      }
 
-      const currentCustomFieldValues =
-        await this.transactionCustomFieldRepository.findByTransactionId({
-          transaction_id: updatedTransaction.id,
-          user_id: data.userId,
-        });
+        if (previousCustomFieldValues) {
+          try {
+            await this.replaceCustomFieldValues(
+              transaction.id,
+              data.userId!,
+              previousCustomFieldValues.map((field) => ({
+                custom_field_id: field.custom_field_id!,
+                value: field.value,
+              }))
+            );
+          } catch (rollbackError) {
+            logger.error(
+              `Falha ao restaurar os campos da transação ${transaction.id} no MongoDB: ${
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : String(rollbackError)
+              }`
+            );
+          }
+        }
+
+        throw customFieldError;
+      }
 
       let enrichedCustomFields: CustomFieldValueWithMetadata[] | null = [];
       if (currentCustomFieldValues && currentCustomFieldValues?.length > 0) {
