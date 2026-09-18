@@ -2,6 +2,7 @@ import {
   TransactionModel,
   TransactionModelMock,
 } from "@/domain/models/postgres/TransactionModel";
+import { FilterParam } from "@/presentation/controllers/interfaces/FilterParam";
 
 export interface TransactionRepositoryProtocol {
   create(
@@ -10,6 +11,13 @@ export interface TransactionRepositoryProtocol {
   findByUserIdAndMonthlyRecordId(
     data: TransactionRepositoryProtocol.FindByUserAndMonthlyRecordIdParams
   ): Promise<TransactionModelMock[]>;
+  findPaginatedByUserIdAndMonthlyRecordId(
+    data: TransactionRepositoryProtocol.FindPaginatedParams
+  ): Promise<{
+    transactions: TransactionModelMock[];
+    total: number;
+    totalAmount: number;
+  }>;
   findByIdAndUserId(
     data: TransactionRepositoryProtocol.FindByIdAndUserIdParams
   ): Promise<TransactionModelMock | null>;
@@ -34,6 +42,15 @@ export namespace TransactionRepositoryProtocol {
   export type FindByUserAndMonthlyRecordIdParams = {
     userId: TransactionModel["user_id"];
     monthlyRecordId: TransactionModel["monthly_record_id"];
+  };
+  export type FindPaginatedParams = {
+    userId: string;
+    monthlyRecordId: string;
+    page: number;
+    limit: number;
+    sortBy?: string;
+    order?: string;
+    filters?: FilterParam[];
   };
 
   export type FindByIdAndUserIdParams = {

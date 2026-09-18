@@ -1,4 +1,4 @@
-import { Repository, getRepository } from "typeorm";
+import { Repository, SelectQueryBuilder, getRepository } from "typeorm";
 import { Transaction } from "@/domain/entities/postgres/Transaction";
 import {
   TransactionModel,
@@ -9,9 +9,27 @@ import { Category } from "@/domain/entities/postgres/Category";
 import { MonthlyRecord } from "@/domain/entities/postgres/MonthlyRecord";
 import { TransactionRepositoryProtocol } from "../interfaces/transactionRepositoryProtocol";
 import { NotFoundError } from "@/data/errors/NotFoundError";
+import { FilterParam } from "@/presentation/controllers/interfaces/FilterParam";
+
+type QueryField = {
+  column: string;
+  type: "text" | "number" | "date";
+};
 
 export class TransactionRepository implements TransactionRepositoryProtocol {
   private repository: Repository<Transaction>;
+  private readonly queryFields: Record<string, QueryField> = {
+    title: { column: "transaction.title", type: "text" },
+    description: { column: "transaction.description", type: "text" },
+    amount: { column: "transaction.amount", type: "number" },
+    transaction_date: {
+      column: "transaction.transaction_date",
+      type: "date",
+    },
+    created_at: { column: "transaction.created_at", type: "date" },
+    updated_at: { column: "transaction.updated_at", type: "date" },
+    "category.name": { column: "category.name", type: "text" },
+  };
 
   constructor() {
     this.repository = getRepository(Transaction);
@@ -77,6 +95,60 @@ export class TransactionRepository implements TransactionRepositoryProtocol {
       created_at: transaction.created_at,
       updated_at: transaction.updated_at,
     }));
+  }
+
+  async findPaginatedByUserIdAndMonthlyRecordId(
+    data: TransactionRepositoryProtocol.FindPaginatedParams
+  ): Promise<{
+    transactions: TransactionModelMock[];
+    total: number;
+    totalAmount: number;
+  }> {
+    const baseQuery = this.repository
+      .createQueryBuilder("transaction")
+      .innerJoinAndSelect("transaction.user", "user")
+      .innerJoinAndSelect("transaction.category", "category")
+      .innerJoinAndSelect("transaction.monthly_record", "monthlyRecord")
+      .where("user.id = :userId", { userId: data.userId })
+      .andWhere("monthlyRecord.id = :monthlyRecordId", {
+        monthlyRecordId: data.monthlyRecordId,
+      });
+
+    for (const [index, filter] of (data.filters || []).entries()) {
+      this.applyFilter(baseQuery, filter, index);
+    }
+
+    const sortField =
+      this.queryFields[data.sortBy || ""]?.column ||
+      "transaction.transaction_date";
+    const order = data.sortBy
+      ? data.order?.toLowerCase() === "desc"
+        ? "DESC"
+        : "ASC"
+      : "DESC";
+    const pageQuery = baseQuery
+      .clone()
+      .orderBy(sortField, order)
+      .addOrderBy("transaction.id", "ASC")
+      .skip((data.page - 1) * data.limit)
+      .take(data.limit);
+    const totalAmountQuery = baseQuery
+      .clone()
+      .select("COALESCE(SUM(transaction.amount), 0)", "totalAmount")
+      .orderBy();
+
+    const [[transactions, total], amountResult] = await Promise.all([
+      pageQuery.getManyAndCount(),
+      totalAmountQuery.getRawOne<{ totalAmount: string }>(),
+    ]);
+
+    return {
+      transactions: transactions.map((transaction) =>
+        this.toModel(transaction)
+      ),
+      total,
+      totalAmount: Number(amountResult?.totalAmount ?? 0),
+    };
   }
 
   /**
@@ -183,5 +255,130 @@ export class TransactionRepository implements TransactionRepositoryProtocol {
 
     const updatedTransaction = await this.repository.save(transaction);
     return updatedTransaction;
+  }
+
+  private applyFilter(
+    query: SelectQueryBuilder<Transaction>,
+    filter: FilterParam,
+    index: number
+  ): void {
+    const field = this.queryFields[filter.field];
+    if (!field) return;
+
+    const parameter = `filter_${index}`;
+    const secondParameter = `${parameter}_end`;
+    const normalizedValue =
+      field.type === "text"
+        ? String(filter.value).toLowerCase().trim()
+        : filter.value;
+
+    switch (filter.operator) {
+      case "equals":
+        if (field.type === "text") {
+          query.andWhere(
+            `LOWER(COALESCE(${field.column}, '')) = :${parameter}`,
+            {
+              [parameter]: normalizedValue,
+            }
+          );
+        } else if (field.type === "date") {
+          query.andWhere(`DATE(${field.column}) = :${parameter}`, {
+            [parameter]: filter.value,
+          });
+        } else {
+          query.andWhere(`${field.column} = :${parameter}`, {
+            [parameter]: filter.value,
+          });
+        }
+        break;
+      case "contains":
+      case "startsWith":
+      case "endsWith": {
+        if (field.type !== "text") {
+          query.andWhere("1 = 0");
+          break;
+        }
+        const pattern =
+          filter.operator === "contains"
+            ? `%${normalizedValue}%`
+            : filter.operator === "startsWith"
+              ? `${normalizedValue}%`
+              : `%${normalizedValue}`;
+        query.andWhere(
+          `LOWER(COALESCE(${field.column}, '')) LIKE :${parameter}`,
+          {
+            [parameter]: pattern,
+          }
+        );
+        break;
+      }
+      case "gt":
+      case "gte":
+      case "lt":
+      case "lte": {
+        if (field.type === "text") {
+          query.andWhere("1 = 0");
+          break;
+        }
+        const operators = { gt: ">", gte: ">=", lt: "<", lte: "<=" };
+        query.andWhere(
+          `${field.column} ${operators[filter.operator]} :${parameter}`,
+          { [parameter]: filter.value }
+        );
+        break;
+      }
+      case "between":
+        if (
+          field.type === "text" ||
+          filter.value2 === undefined ||
+          filter.value2 === null ||
+          filter.value2 === ""
+        ) {
+          query.andWhere("1 = 0");
+          break;
+        }
+        query.andWhere(
+          `${field.column} BETWEEN :${parameter} AND :${secondParameter}`,
+          {
+            [parameter]: filter.value,
+            [secondParameter]: filter.value2,
+          }
+        );
+        break;
+      case "in": {
+        if (!Array.isArray(filter.value) || filter.value.length === 0) {
+          query.andWhere("1 = 0");
+          break;
+        }
+        const values =
+          field.type === "text"
+            ? filter.value.map((value) => String(value).toLowerCase().trim())
+            : filter.value;
+        const expression =
+          field.type === "text"
+            ? `LOWER(COALESCE(${field.column}, ''))`
+            : field.column;
+        query.andWhere(`${expression} IN (:...${parameter})`, {
+          [parameter]: values,
+        });
+        break;
+      }
+    }
+  }
+
+  private toModel(transaction: Transaction): TransactionModelMock {
+    return {
+      id: transaction.id,
+      title: transaction.title,
+      description: transaction.description,
+      amount: transaction.amount,
+      transaction_date: transaction.transaction_date,
+      monthly_record_id: transaction.monthly_record.id,
+      category_id: transaction.category.id,
+      category_name: transaction.category.name,
+      user_id: transaction.user.id,
+      created_at: transaction.created_at,
+      updated_at: transaction.updated_at,
+    };
   }
 }

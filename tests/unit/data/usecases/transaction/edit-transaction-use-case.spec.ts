@@ -29,6 +29,7 @@ export const makeTransactionRepository =
   (): jest.Mocked<TransactionRepositoryProtocol> => ({
     create: jest.fn(),
     findByUserIdAndMonthlyRecordId: jest.fn(),
+    findPaginatedByUserIdAndMonthlyRecordId: jest.fn(),
     findByIdAndUserId: jest.fn().mockResolvedValue(mockTransaction),
     delete: jest.fn(),
     update: jest.fn().mockResolvedValue(mockUpdatedTransaction),

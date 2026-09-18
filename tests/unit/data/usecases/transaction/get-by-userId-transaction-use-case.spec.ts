@@ -21,6 +21,11 @@ export const makeTransactionRepository =
     findByUserIdAndMonthlyRecordId: jest
       .fn()
       .mockResolvedValue([mockTransaction]),
+    findPaginatedByUserIdAndMonthlyRecordId: jest.fn().mockResolvedValue({
+      transactions: [mockTransaction],
+      total: 1,
+      totalAmount: Number(mockTransaction.amount),
+    }),
     ...({} as any),
   });
 
@@ -231,23 +236,33 @@ describe("GetByUserIdTransactionUseCase", () => {
   });
 
   test("should paginate results and keep the total amount", async () => {
-    const { sut, transactionRepositorySpy } = makeSut();
+    const {
+      sut,
+      transactionRepositorySpy,
+      transactionCustomFieldsRepositorySpy,
+    } = makeSut();
     const secondTransaction = {
       ...mockTransaction,
       id: "transaction-456",
       title: "Second transaction",
       amount: 49.25,
     };
-    transactionRepositorySpy.findByUserIdAndMonthlyRecordId.mockResolvedValue([
-      mockTransaction,
-      secondTransaction,
-    ]);
+    transactionRepositorySpy.findPaginatedByUserIdAndMonthlyRecordId.mockResolvedValue(
+      {
+        transactions: [secondTransaction],
+        total: 2,
+        totalAmount: 200,
+      }
+    );
 
     const result = await sut.handle({
       userId: mockUser.id,
       monthlyRecordId: mockMonthlyRecord.id,
       page: 2,
       limit: 1,
+      sortBy: "amount",
+      order: "desc",
+      filters: [{ field: "amount", operator: "gt", value: 0 }],
     });
 
     expect(result.transactions).toEqual([
@@ -260,6 +275,76 @@ describe("GetByUserIdTransactionUseCase", () => {
       total: 2,
       totalPages: 2,
     });
+    expect(
+      transactionRepositorySpy.findPaginatedByUserIdAndMonthlyRecordId
+    ).toHaveBeenCalledWith({
+      userId: mockUser.id,
+      monthlyRecordId: mockMonthlyRecord.id,
+      page: 2,
+      limit: 1,
+      sortBy: "amount",
+      order: "desc",
+      filters: [{ field: "amount", operator: "gt", value: 0 }],
+    });
+    expect(
+      transactionRepositorySpy.findByUserIdAndMonthlyRecordId
+    ).not.toHaveBeenCalled();
+    expect(
+      transactionCustomFieldsRepositorySpy.findByTransactionIds
+    ).toHaveBeenCalledWith({
+      transaction_ids: [secondTransaction.id],
+      user_id: mockUser.id,
+    });
+  });
+
+  test("should keep in-memory pagination for custom field filters", async () => {
+    const {
+      sut,
+      transactionRepositorySpy,
+      transactionCustomFieldsRepositorySpy,
+    } = makeSut();
+    transactionCustomFieldsRepositorySpy.findByTransactionIds.mockResolvedValue(
+      [
+        {
+          id: "custom-value-123",
+          transaction_id: mockTransaction.id,
+          custom_field_id: mockCustomField.id,
+          value: "Matching value",
+          user_id: mockUser.id,
+        },
+      ]
+    );
+
+    const result = await sut.handle({
+      userId: mockUser.id,
+      monthlyRecordId: mockMonthlyRecord.id,
+      page: 1,
+      limit: 10,
+      filters: [
+        {
+          field: "customFields.custom_text_field",
+          operator: "contains",
+          value: "matching",
+        },
+      ],
+    });
+
+    expect(result.transactions).toHaveLength(1);
+    expect(result.pagination).toEqual({
+      page: 1,
+      limit: 10,
+      total: 1,
+      totalPages: 1,
+    });
+    expect(
+      transactionRepositorySpy.findByUserIdAndMonthlyRecordId
+    ).toHaveBeenCalledWith({
+      userId: mockUser.id,
+      monthlyRecordId: mockMonthlyRecord.id,
+    });
+    expect(
+      transactionRepositorySpy.findPaginatedByUserIdAndMonthlyRecordId
+    ).not.toHaveBeenCalled();
   });
 
   test("should reject a page size greater than 100", async () => {

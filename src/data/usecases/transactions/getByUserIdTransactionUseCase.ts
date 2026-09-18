@@ -30,6 +30,16 @@ import { FilterParam } from "@/presentation/controllers/interfaces/FilterParam";
 export class GetByUserIdTransactionUseCase
   implements GetByUserIdTransactionUseCaseProtocol
 {
+  private readonly nativeFields = new Set([
+    "title",
+    "description",
+    "amount",
+    "transaction_date",
+    "created_at",
+    "updated_at",
+    "category.name",
+  ]);
+
   constructor(
     private readonly transactionRepository: TransactionRepositoryProtocol,
     private readonly userRepository: UserRepositoryProtocol,
@@ -75,11 +85,36 @@ export class GetByUserIdTransactionUseCase
         );
       }
 
-      const transactions =
-        await this.transactionRepository.findByUserIdAndMonthlyRecordId({
-          userId: data.userId,
-          monthlyRecordId: data.monthlyRecordId,
-        });
+      const page = data.page ?? 1;
+      const limit = data.limit ?? 10;
+      const canUseDatabasePagination =
+        data.paginate !== false &&
+        data.page !== undefined &&
+        data.limit !== undefined &&
+        (data.filters || []).every((filter) =>
+          this.nativeFields.has(filter.field)
+        ) &&
+        (!data.sortBy || this.nativeFields.has(data.sortBy));
+
+      const databaseResult = canUseDatabasePagination
+        ? await this.transactionRepository.findPaginatedByUserIdAndMonthlyRecordId(
+            {
+              userId: data.userId!,
+              monthlyRecordId: data.monthlyRecordId!,
+              page,
+              limit,
+              sortBy: data.sortBy,
+              order: data.order,
+              filters: data.filters,
+            }
+          )
+        : undefined;
+      const transactions = databaseResult
+        ? databaseResult.transactions
+        : await this.transactionRepository.findByUserIdAndMonthlyRecordId({
+            userId: data.userId,
+            monthlyRecordId: data.monthlyRecordId,
+          });
 
       let fieldTypes: Record<string, string> = {
         title: "text",
@@ -92,15 +127,20 @@ export class GetByUserIdTransactionUseCase
 
       let customFieldDefs: CustomFieldModel[] = [];
 
-      if (transactions.length > 0) {
+      const categoryId =
+        monthlyRecord.category?.id ??
+        monthlyRecord.category_id ??
+        transactions[0]?.category_id;
+
+      if (categoryId) {
         const category = await this.categoryRepository.findByIdAndUserId({
-          id: String(transactions[0].category_id),
+          id: String(categoryId),
           userId: data.userId,
         });
 
         if (!category) {
           throw new NotFoundError(
-            `Categoria com ID ${transactions[0].category_id} não encontrada para este usuário`
+            `Categoria com ID ${categoryId} não encontrada para este usuário`
           );
         }
         recordTypeId = category.record_type_id;
@@ -108,7 +148,7 @@ export class GetByUserIdTransactionUseCase
         const { customFields } =
           await this.customFieldRepository.findByRecordTypeId({
             record_type_id: recordTypeId!,
-            category_id: transactions[0].category_id,
+            category_id: categoryId,
             user_id: data.userId,
           });
 
@@ -180,7 +220,11 @@ export class GetByUserIdTransactionUseCase
 
       let result = enrichedTransactions;
 
-      if (data.filters && data.filters.length > 0) {
+      if (
+        !canUseDatabasePagination &&
+        data.filters &&
+        data.filters.length > 0
+      ) {
         const tempItems = enrichedTransactions.map((enriched) => {
           const customMap: Record<string, string> = {};
           if (enriched.customFields && enriched.customFields.length > 0) {
@@ -215,7 +259,7 @@ export class GetByUserIdTransactionUseCase
         );
       }
 
-      if (data.sortBy) {
+      if (!canUseDatabasePagination && data.sortBy) {
         const direction = data.order === "desc" ? "desc" : "asc";
 
         const tempItemsForSort = result.map((enriched) => {
@@ -251,18 +295,20 @@ export class GetByUserIdTransactionUseCase
         );
       }
 
-      const totalAmount = result.reduce(
-        (acc, { transaction }) =>
-          acc + (parseFloat(String(transaction.amount)) || 0),
-        0
-      );
-      const page = data.page ?? 1;
-      const limit = data.limit ?? 10;
-      const total = result.length;
+      const totalAmount = databaseResult
+        ? databaseResult.totalAmount
+        : result.reduce(
+            (acc, { transaction }) =>
+              acc + (parseFloat(String(transaction.amount)) || 0),
+            0
+          );
+      const total = databaseResult?.total ?? result.length;
       const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
       const offset = (page - 1) * limit;
       const paginatedTransactions =
-        data.paginate === false ? result : result.slice(offset, offset + limit);
+        canUseDatabasePagination || data.paginate === false
+          ? result
+          : result.slice(offset, offset + limit);
 
       return {
         transactions: paginatedTransactions,
