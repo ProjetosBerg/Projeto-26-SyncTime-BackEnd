@@ -36,12 +36,11 @@ export const makeMonthlyRecordRepository =
 
 export const makeGetByUserIdTransactionUseCase =
   (): jest.Mocked<GetByUserIdTransactionUseCaseProtocol> => ({
-    handle: jest
-      .fn()
-      .mockResolvedValue({
-        transactions: [mockEnrichedTransaction],
-        totalAmount: mockTransaction.amount,
-      }),
+    handle: jest.fn().mockResolvedValue({
+      transactions: [mockEnrichedTransaction],
+      totalAmount: mockTransaction.amount,
+      pagination: { page: 1, limit: 1, total: 1, totalPages: 1 },
+    }),
     ...({} as any),
   });
 
@@ -120,6 +119,7 @@ describe("ExportTransactionUseCase", () => {
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledWith({
       userId: input.userId,
       monthlyRecordId: input.monthlyRecordId,
+      paginate: false,
     });
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledTimes(1);
     expect(genericExportUseCaseSpy.handle).toHaveBeenCalledTimes(1);
@@ -144,6 +144,7 @@ describe("ExportTransactionUseCase", () => {
     getByUserIdTransactionUseCaseSpy.handle.mockResolvedValue({
       transactions: [],
       totalAmount: 0,
+      pagination: { page: 1, limit: 1, total: 0, totalPages: 0 },
     });
 
     const input = {
@@ -171,6 +172,7 @@ describe("ExportTransactionUseCase", () => {
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledWith({
       userId: input.userId,
       monthlyRecordId: input.monthlyRecordId,
+      paginate: false,
     });
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledTimes(1);
     expect(genericExportUseCaseSpy.handle).not.toHaveBeenCalled();
@@ -341,6 +343,7 @@ describe("ExportTransactionUseCase", () => {
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledWith({
       userId: input.userId,
       monthlyRecordId: input.monthlyRecordId,
+      paginate: false,
     });
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledTimes(1);
     expect(genericExportUseCaseSpy.handle).not.toHaveBeenCalled();
@@ -380,6 +383,7 @@ describe("ExportTransactionUseCase", () => {
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledWith({
       userId: input.userId,
       monthlyRecordId: input.monthlyRecordId,
+      paginate: false,
     });
     expect(getByUserIdTransactionUseCaseSpy.handle).toHaveBeenCalledTimes(1);
     expect(genericExportUseCaseSpy.handle).toHaveBeenCalledTimes(1);

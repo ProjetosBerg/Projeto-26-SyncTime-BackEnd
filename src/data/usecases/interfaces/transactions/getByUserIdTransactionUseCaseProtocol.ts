@@ -13,6 +13,12 @@ export interface GetByUserIdTransactionUseCaseProtocol {
       recordTypeId?: number;
     }>;
     totalAmount: number;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
   }>;
 }
 
@@ -23,5 +29,8 @@ export namespace GetByUserIdTransactionUseCaseProtocol {
     sortBy?: string;
     order?: string;
     filters?: FilterParam[];
+    page?: number;
+    limit?: number;
+    paginate?: boolean;
   };
 }

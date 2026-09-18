@@ -137,6 +137,12 @@ describe("GetByUserIdTransactionUseCase", () => {
         },
       ],
       totalAmount: 150.75,
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      },
     });
 
     expect(userRepositorySpy.findOne).toHaveBeenCalledWith({
@@ -192,7 +198,16 @@ describe("GetByUserIdTransactionUseCase", () => {
 
     const result = await sut.handle(input);
 
-    expect(result).toEqual({ transactions: [], totalAmount: 0 });
+    expect(result).toEqual({
+      transactions: [],
+      totalAmount: 0,
+      pagination: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      },
+    });
     expect(userRepositorySpy.findOne).toHaveBeenCalledWith({
       id: input.userId,
     });
@@ -213,6 +228,56 @@ describe("GetByUserIdTransactionUseCase", () => {
     expect(
       transactionRepositorySpy.findByUserIdAndMonthlyRecordId
     ).toHaveBeenCalledTimes(1);
+  });
+
+  test("should paginate results and keep the total amount", async () => {
+    const { sut, transactionRepositorySpy } = makeSut();
+    const secondTransaction = {
+      ...mockTransaction,
+      id: "transaction-456",
+      title: "Second transaction",
+      amount: 49.25,
+    };
+    transactionRepositorySpy.findByUserIdAndMonthlyRecordId.mockResolvedValue([
+      mockTransaction,
+      secondTransaction,
+    ]);
+
+    const result = await sut.handle({
+      userId: mockUser.id,
+      monthlyRecordId: mockMonthlyRecord.id,
+      page: 2,
+      limit: 1,
+    });
+
+    expect(result.transactions).toEqual([
+      expect.objectContaining({ transaction: secondTransaction }),
+    ]);
+    expect(result.totalAmount).toBe(200);
+    expect(result.pagination).toEqual({
+      page: 2,
+      limit: 1,
+      total: 2,
+      totalPages: 2,
+    });
+  });
+
+  test("should reject a page size greater than 100", async () => {
+    const { sut, userRepositorySpy, transactionRepositorySpy } = makeSut();
+
+    await expect(
+      sut.handle({
+        userId: mockUser.id,
+        monthlyRecordId: mockMonthlyRecord.id,
+        page: 1,
+        limit: 101,
+      })
+    ).rejects.toThrow(ValidationError);
+
+    expect(userRepositorySpy.findOne).not.toHaveBeenCalled();
+    expect(
+      transactionRepositorySpy.findByUserIdAndMonthlyRecordId
+    ).not.toHaveBeenCalled();
   });
 
   test("should throw ValidationError if userId is empty", async () => {

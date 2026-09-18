@@ -17,7 +17,13 @@ export class GetByUserIdTransactionController implements Controller {
     res: Response<IResponse>
   ): Promise<Response<IResponse>> {
     try {
-      const { monthlyRecordId, sortBy = "", order } = req.query;
+      const {
+        monthlyRecordId,
+        sortBy = "",
+        order,
+        page = "1",
+        limit = "10",
+      } = req.query;
       let filters: FilterParam[] = [];
 
       if (req.query.filters) {
@@ -34,8 +40,10 @@ export class GetByUserIdTransactionController implements Controller {
         monthlyRecordId: String(monthlyRecordId),
         userId: req.user!.id,
         sortBy: sortBy as any,
-        order: String(order),
+        order: order ? String(order) : "",
         filters,
+        page: Number(page),
+        limit: Number(limit),
       });
       return res.status(200).json({
         status: ResponseStatus.OK,

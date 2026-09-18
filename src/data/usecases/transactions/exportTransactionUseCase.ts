@@ -95,6 +95,7 @@ export class ExportTransactionUseCase
           sortBy: data.sortBy,
           order: data.order,
           filters: data.filters,
+          paginate: false,
         });
 
       if (enrichedTransactions.length === 0) {

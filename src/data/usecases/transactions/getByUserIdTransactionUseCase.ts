@@ -46,6 +46,12 @@ export class GetByUserIdTransactionUseCase
       recordTypeId?: number;
     }>;
     totalAmount: number;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
   }> {
     let recordTypeId: number | undefined = undefined;
     try {
@@ -250,8 +256,25 @@ export class GetByUserIdTransactionUseCase
           acc + (parseFloat(String(transaction.amount)) || 0),
         0
       );
+      const page = data.page ?? 1;
+      const limit = data.limit ?? 10;
+      const total = result.length;
+      const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+      const offset = (page - 1) * limit;
+      const paginatedTransactions =
+        data.paginate === false ? result : result.slice(offset, offset + limit);
 
-      return { transactions: result, totalAmount };
+      return {
+        transactions: paginatedTransactions,
+        totalAmount,
+        pagination: {
+          page,
+          limit: data.paginate === false ? Math.max(total, 1) : limit,
+          total,
+          totalPages:
+            data.paginate === false ? (total === 0 ? 0 : 1) : totalPages,
+        },
+      };
     } catch (error: any) {
       if (error.name === "ValidationError") {
         throw error;
