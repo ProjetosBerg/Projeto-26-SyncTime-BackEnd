@@ -126,7 +126,7 @@ describe("CreateTransactionUseCase", () => {
       title: "teste",
       description: "teste",
       amount: 150.75,
-      transactionDate: new Date("2025-07-02"),
+      transactionDate: new Date("2025-07-01"),
       monthlyRecordId: mockMonthlyRecord.id,
       categoryId: mockCategory.id,
       userId: mockUser.id,
@@ -424,10 +424,10 @@ describe("CreateTransactionUseCase", () => {
       title: "teste",
       description: "teste",
       amount: 150.75,
-      transactionDate: new Date("2025-07-01"),
+      transactionDate: new Date("2025-08-01"),
       monthlyRecordId: mockMonthlyRecord.id,
-      categoryId: "category-id",
-      userId: "user-id",
+      categoryId: mockCategory.id,
+      userId: mockUser.id,
     };
 
     await expect(sut.handle(input)).rejects.toThrow(
@@ -477,8 +477,8 @@ describe("CreateTransactionUseCase", () => {
       amount: 150.75,
       transactionDate: new Date("2025-07-02"),
       monthlyRecordId: mockMonthlyRecord.id,
-      categoryId: "category-id",
-      userId: "user-id",
+      categoryId: mockCategory.id,
+      userId: mockUser.id,
     };
 
     await expect(sut.handle(input)).rejects.toThrow(

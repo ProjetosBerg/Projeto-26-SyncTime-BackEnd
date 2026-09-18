@@ -49,7 +49,7 @@ describe("MarkReadNotificationUseCase", () => {
 
   test("should mark multiple notifications as read successfully", async () => {
     const { sut, notificationRepositorySpy } = makeSut();
-    const mockIds = [mockNotification.id, faker.datatype.uuid()];
+    const mockIds = [mockNotification.id, faker.string.uuid()];
 
     await sut.handle({
       userId: mockNotification.user_id,

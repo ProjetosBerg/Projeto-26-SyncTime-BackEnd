@@ -6,12 +6,14 @@ import { mockCategory } from "@/tests/unit/mocks/category/mockCategory";
 import { ValidationError } from "yup";
 import { DeleteCategoryUseCase } from "@/data/usecases/category/deleteCategoryUseCase";
 import { mockUser } from "@/tests/unit/mocks/user/mockUser";
+import { CustomFieldsRepositoryProtocol } from "@/infra/db/interfaces/customFieldsRepositoryProtocol";
+import { TransactionCustomFieldRepositoryProtocol } from "@/infra/db/interfaces/TransactionCustomFieldRepositoryProtocol";
 
 export const makeCategoryRepository =
   (): jest.Mocked<CategoryRepositoryProtocol> => ({
     create: jest.fn(),
     findByNameAndUserId: jest.fn(),
-    findByIdAndUserId: jest.fn(),
+    findByIdAndUserId: jest.fn().mockResolvedValue(mockCategory),
     deleteCategory: jest.fn().mockResolvedValue(undefined),
     ...({} as any),
   });
@@ -21,18 +23,38 @@ export const makeUserRepository = (): jest.Mocked<UserRepositoryProtocol> => ({
   ...({} as any),
 });
 
+export const makeCustomFieldsRepository =
+  (): jest.Mocked<CustomFieldsRepositoryProtocol> => ({
+    deleteByCategoryId: jest.fn().mockResolvedValue(["custom-field-123"]),
+    ...({} as any),
+  });
+
+export const makeTransactionCustomFieldRepository =
+  (): jest.Mocked<TransactionCustomFieldRepositoryProtocol> => ({
+    deleteByTransactionIds: jest.fn().mockResolvedValue(undefined),
+    deleteByCustomFieldIds: jest.fn().mockResolvedValue(undefined),
+    ...({} as any),
+  });
+
 const makeSut = () => {
   const categoryRepositorySpy = makeCategoryRepository();
   const userRepositorySpy = makeUserRepository();
+  const customFieldsRepositorySpy = makeCustomFieldsRepository();
+  const transactionCustomFieldRepositorySpy =
+    makeTransactionCustomFieldRepository();
   const sut = new DeleteCategoryUseCase(
     categoryRepositorySpy,
-    userRepositorySpy
+    userRepositorySpy,
+    customFieldsRepositorySpy,
+    transactionCustomFieldRepositorySpy
   );
 
   return {
     sut,
     categoryRepositorySpy,
     userRepositorySpy,
+    customFieldsRepositorySpy,
+    transactionCustomFieldRepositorySpy,
   };
 };
 
@@ -42,8 +64,18 @@ describe("DeleteCategoryUseCase", () => {
   });
 
   test("should delete a category successfully", async () => {
-    const { sut, categoryRepositorySpy, userRepositorySpy } = makeSut();
+    const {
+      sut,
+      categoryRepositorySpy,
+      userRepositorySpy,
+      customFieldsRepositorySpy,
+      transactionCustomFieldRepositorySpy,
+    } = makeSut();
     userRepositorySpy.findOne.mockResolvedValue(mockUser);
+    categoryRepositorySpy.findByIdAndUserId.mockResolvedValue({
+      ...mockCategory,
+      transactions: [{ id: "transaction-123" } as any],
+    });
     categoryRepositorySpy.deleteCategory.mockResolvedValue(undefined);
 
     const input = {
@@ -62,6 +94,22 @@ describe("DeleteCategoryUseCase", () => {
       userId: input.userId,
     });
     expect(categoryRepositorySpy.deleteCategory).toHaveBeenCalledTimes(1);
+    expect(customFieldsRepositorySpy.deleteByCategoryId).toHaveBeenCalledWith({
+      category_id: input.categoryId,
+      user_id: input.userId,
+    });
+    expect(
+      transactionCustomFieldRepositorySpy.deleteByTransactionIds
+    ).toHaveBeenCalledWith({
+      transaction_ids: ["transaction-123"],
+      user_id: input.userId,
+    });
+    expect(
+      transactionCustomFieldRepositorySpy.deleteByCustomFieldIds
+    ).toHaveBeenCalledWith({
+      custom_field_ids: ["custom-field-123"],
+      user_id: input.userId,
+    });
   });
 
   test("should throw ValidationError if id is missing", async () => {
@@ -116,11 +164,7 @@ describe("DeleteCategoryUseCase", () => {
   test("should throw NotFoundError if category does not exist", async () => {
     const { sut, categoryRepositorySpy, userRepositorySpy } = makeSut();
     userRepositorySpy.findOne.mockResolvedValue(mockUser);
-    categoryRepositorySpy.deleteCategory.mockRejectedValue(
-      new NotFoundError(
-        `Categoria com ID ${mockCategory.id} não encontrada para este usuário`
-      )
-    );
+    categoryRepositorySpy.findByIdAndUserId.mockResolvedValue(null);
 
     const input = {
       categoryId: mockCategory.id!,
@@ -136,11 +180,11 @@ describe("DeleteCategoryUseCase", () => {
       id: input.userId,
     });
     expect(userRepositorySpy.findOne).toHaveBeenCalledTimes(1);
-    expect(categoryRepositorySpy.deleteCategory).toHaveBeenCalledWith({
+    expect(categoryRepositorySpy.findByIdAndUserId).toHaveBeenCalledWith({
       id: input.categoryId,
       userId: input.userId,
     });
-    expect(categoryRepositorySpy.deleteCategory).toHaveBeenCalledTimes(1);
+    expect(categoryRepositorySpy.deleteCategory).not.toHaveBeenCalled();
   });
 
   test("should throw ServerError on unexpected error", async () => {

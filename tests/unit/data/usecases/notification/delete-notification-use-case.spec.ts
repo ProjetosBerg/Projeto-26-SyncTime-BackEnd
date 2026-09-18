@@ -46,7 +46,7 @@ describe("DeleteNotificationUseCase", () => {
 
   test("should delete multiple notifications successfully", async () => {
     const { sut, notificationRepositorySpy } = makeSut();
-    const mockIds = [mockNotification.id, faker.datatype.uuid()];
+    const mockIds = [mockNotification.id, faker.string.uuid()];
 
     await sut.handle({
       userId: mockNotification.user_id as string,

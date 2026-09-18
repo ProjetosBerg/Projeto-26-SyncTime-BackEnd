@@ -161,8 +161,8 @@ export class CreateTransactionUseCase
       const transactionDate = new Date(data.transactionDate);
       const recordMonth = monthlyRecord.month;
       const recordYear = monthlyRecord.year;
-      const transactionMonth = transactionDate.getMonth() + 1;
-      const transactionYear = transactionDate.getFullYear();
+      const transactionMonth = transactionDate.getUTCMonth() + 1;
+      const transactionYear = transactionDate.getUTCFullYear();
 
       if (transactionMonth !== recordMonth || transactionYear !== recordYear) {
         throw new BusinessRuleError(

@@ -195,8 +195,8 @@ export class EditTransactionUseCase implements EditTransactionUseCaseProtocol {
       const effectiveTransactionDate = new Date(
         data.transactionDate ?? transaction.transaction_date
       );
-      const transactionMonth = effectiveTransactionDate.getMonth() + 1;
-      const transactionYear = effectiveTransactionDate.getFullYear();
+      const transactionMonth = effectiveTransactionDate.getUTCMonth() + 1;
+      const transactionYear = effectiveTransactionDate.getUTCFullYear();
       if (
         transactionMonth !== monthlyRecord.month ||
         transactionYear !== monthlyRecord.year
