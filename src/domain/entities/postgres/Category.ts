@@ -8,6 +8,7 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
+  Index,
 } from "typeorm";
 import { RecordTypes } from "./RecordTypes";
 import { User } from "./User";
@@ -16,6 +17,7 @@ import { Transaction } from "./Transaction";
 import { Notes } from "./Notes";
 
 @Entity("categories")
+@Index("IDX_categories_user", ["user"])
 export class Category extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;

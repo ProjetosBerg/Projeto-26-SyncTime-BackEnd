@@ -8,12 +8,19 @@ import {
   ManyToOne,
   JoinColumn,
   OneToMany,
+  Index,
 } from "typeorm";
 import { Category } from "./Category";
 import { User } from "./User";
 import { Transaction } from "./Transaction";
 // TODO: adicionar status
 @Entity("monthly_records")
+@Index("IDX_monthly_records_user_category_period", [
+  "user",
+  "category",
+  "year",
+  "month",
+])
 export class MonthlyRecord extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;

@@ -78,6 +78,7 @@ export const makeMonthlyRecordRepository =
       records: [mockMonthlyRecord],
       total: 1,
     }),
+    findForDashboard: jest.fn().mockResolvedValue([mockMonthlyRecord]),
     ...({} as any),
   });
 
@@ -173,7 +174,16 @@ describe("GetDashboardCategoryUseCase", () => {
       userId: input.userId,
     });
     expect(categoryRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
-    expect(monthlyRecordRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
+    expect(monthlyRecordRepositorySpy.findForDashboard).toHaveBeenCalledWith({
+      userId: input.userId,
+      categoryIds: [mockCategoryWithRecordType.id],
+      startDate: undefined,
+      endDate: undefined,
+    });
+    expect(monthlyRecordRepositorySpy.findForDashboard).toHaveBeenCalledTimes(
+      1
+    );
+    expect(monthlyRecordRepositorySpy.findByUserId).not.toHaveBeenCalled();
     expect(
       transactionCustomFieldRepositorySpy.findByTransactionIds
     ).toHaveBeenCalledWith({
@@ -210,11 +220,18 @@ describe("GetDashboardCategoryUseCase", () => {
       userId: input.userId,
     });
     expect(categoryRepositorySpy.findByIdAndUserId).toHaveBeenCalledTimes(1);
-    expect(monthlyRecordRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
+    expect(monthlyRecordRepositorySpy.findForDashboard).toHaveBeenCalledTimes(
+      1
+    );
   });
 
   test("should filter records by date range when startDate and endDate are provided", async () => {
-    const { sut, userRepositorySpy, categoryRepositorySpy } = makeSut();
+    const {
+      sut,
+      userRepositorySpy,
+      categoryRepositorySpy,
+      monthlyRecordRepositorySpy,
+    } = makeSut();
     const input = {
       userId: String(mockUser.id),
       startDate: "2024-01-01",
@@ -231,6 +248,12 @@ describe("GetDashboardCategoryUseCase", () => {
     });
     expect(userRepositorySpy.findOne).toHaveBeenCalledTimes(1);
     expect(categoryRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
+    expect(monthlyRecordRepositorySpy.findForDashboard).toHaveBeenCalledWith({
+      userId: input.userId,
+      categoryIds: [mockCategoryWithRecordType.id],
+      startDate: input.startDate,
+      endDate: input.endDate,
+    });
   });
 
   test("should group data by specified groupBy parameter", async () => {
@@ -306,10 +329,7 @@ describe("GetDashboardCategoryUseCase", () => {
     } = makeSut();
     const input = { userId: String(mockUser.id) };
     userRepositorySpy.findOne.mockResolvedValue(mockUser);
-    monthlyRecordRepositorySpy.findByUserId.mockResolvedValue({
-      records: [],
-      total: 0,
-    });
+    monthlyRecordRepositorySpy.findForDashboard.mockResolvedValue([]);
 
     const result = await sut.handle(input);
 
@@ -322,7 +342,9 @@ describe("GetDashboardCategoryUseCase", () => {
     });
     expect(userRepositorySpy.findOne).toHaveBeenCalledTimes(1);
     expect(categoryRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
-    expect(monthlyRecordRepositorySpy.findByUserId).toHaveBeenCalledTimes(1);
+    expect(monthlyRecordRepositorySpy.findForDashboard).toHaveBeenCalledTimes(
+      1
+    );
   });
 
   test("should calculate correct summary statistics", async () => {

@@ -52,30 +52,16 @@ export class GetDashboardCategoryUseCase
       if (categories.length === 0) {
         throw new NotFoundError("Nenhuma categoria encontrada");
       }
-      const recordsByCategory = await Promise.all(
-        categories.map((category) =>
-          this.monthlyRecordRepository.findByUserId({
-            userId: data.userId,
-            categoryId: category!.id,
-            page: 1,
-            limit: 1000,
-          })
-        )
-      );
-      const allMonthlyRecords = recordsByCategory.flatMap(
-        ({ records }) => records
-      );
-      let filteredRecords = allMonthlyRecords;
-      if (data.startDate || data.endDate) {
-        filteredRecords = this.filterRecordsByDate(
-          allMonthlyRecords,
-          data.startDate,
-          data.endDate
-        );
-      }
+      const allMonthlyRecords =
+        await this.monthlyRecordRepository.findForDashboard({
+          userId: data.userId,
+          categoryIds: categories.map((category) => category!.id!),
+          startDate: data.startDate,
+          endDate: data.endDate,
+        });
       const detailedData = await this.buildDetailedData(
         categories,
-        filteredRecords,
+        allMonthlyRecords,
         data.userId
       );
       const summary = this.calculateSummary(detailedData);
@@ -154,28 +140,6 @@ export class GetDashboardCategoryUseCase
         `Falha na busca dos dados do dashboard: ${errorMessage}`
       );
     }
-  }
-  private filterRecordsByDate(
-    records: any[],
-    startDate?: string,
-    endDate?: string
-  ): any[] {
-    return records.filter((record) => {
-      const recordDate = new Date(record.year, record.month - 1);
-      if (startDate) {
-        const start = new Date(startDate);
-        if (recordDate < new Date(start.getFullYear(), start.getMonth())) {
-          return false;
-        }
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        if (recordDate > new Date(end.getFullYear(), end.getMonth())) {
-          return false;
-        }
-      }
-      return true;
-    });
   }
   private async buildDetailedData(
     categories: any[],

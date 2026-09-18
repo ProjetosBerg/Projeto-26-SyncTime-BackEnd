@@ -26,6 +26,9 @@ export interface MonthlyRecordRepositoryProtocol {
   findAllByUserId(
     data: MonthlyRecordRepositoryProtocol.FindAllByUserIdParams
   ): Promise<{ records: MonthlyRecordMock[]; total: number }>;
+  findForDashboard(
+    data: MonthlyRecordRepositoryProtocol.FindForDashboardParams
+  ): Promise<MonthlyRecordMock[]>;
 }
 
 export namespace MonthlyRecordRepositoryProtocol {
@@ -68,6 +71,12 @@ export namespace MonthlyRecordRepositoryProtocol {
     limit?: number;
     sortBy?: string;
     order?: "ASC" | "DESC";
+  };
+  export type FindForDashboardParams = {
+    userId: string;
+    categoryIds: string[];
+    startDate?: string;
+    endDate?: string;
   };
   export type UpdateMonthlyRecord = {
     id: MonthlyRecordModel["id"];

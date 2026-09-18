@@ -186,6 +186,62 @@ export class MonthlyRecordRepository
     return { records: mappedRecords, total };
   }
 
+  async findForDashboard(
+    data: MonthlyRecordRepositoryProtocol.FindForDashboardParams
+  ): Promise<MonthlyRecordMock[]> {
+    if (data.categoryIds.length === 0) return [];
+
+    const query = this.repository
+      .createQueryBuilder("monthlyRecord")
+      .innerJoinAndSelect("monthlyRecord.category", "category")
+      .leftJoinAndSelect("monthlyRecord.transactions", "transactions")
+      .where("monthlyRecord.user_id = :userId", { userId: data.userId })
+      .andWhere("monthlyRecord.category_id IN (:...categoryIds)", {
+        categoryIds: data.categoryIds,
+      });
+
+    if (data.startDate) {
+      query.andWhere(
+        "(monthlyRecord.year * 100 + monthlyRecord.month) >= :startPeriod",
+        { startPeriod: this.toYearMonth(data.startDate) }
+      );
+    }
+
+    if (data.endDate) {
+      query.andWhere(
+        "(monthlyRecord.year * 100 + monthlyRecord.month) <= :endPeriod",
+        { endPeriod: this.toYearMonth(data.endDate) }
+      );
+    }
+
+    const records = await query
+      .orderBy("monthlyRecord.year", "ASC")
+      .addOrderBy("monthlyRecord.month", "ASC")
+      .getMany();
+
+    return records.map((record) => ({
+      id: record.id,
+      title: record.title,
+      description: record.description,
+      goal: record.goal,
+      initial_balance: record.initial_balance,
+      month: record.month,
+      year: record.year,
+      status: record.status,
+      category_id: record.category.id,
+      user_id: data.userId,
+      category: record.category,
+      transactions: record.transactions || [],
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+    }));
+  }
+
+  private toYearMonth(date: string): number {
+    const [year, month] = date.split("-").map(Number);
+    return year * 100 + month;
+  }
+
   /**
    * Busca um registro mensal por ID e ID do usuário
    * @param {MonthlyRecordRepositoryProtocol.FindByIdAndUserIdParams} data - Os dados para busca

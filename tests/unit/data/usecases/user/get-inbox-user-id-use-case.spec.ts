@@ -47,6 +47,7 @@ const makeMonthlyRecordRepository =
     create: jest.fn(),
     findOneMonthlyRecord: jest.fn(),
     findByUserId: jest.fn(),
+    findForDashboard: jest.fn(),
     findByIdAndUserId: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),

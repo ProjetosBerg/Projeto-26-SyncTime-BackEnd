@@ -7,12 +7,18 @@ import {
   BaseEntity,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { MonthlyRecord } from "./MonthlyRecord";
 import { Category } from "./Category";
 import { User } from "./User";
 
 @Entity("transactions")
+@Index("IDX_transactions_user_monthly_date", [
+  "user",
+  "monthly_record",
+  "transaction_date",
+])
 export class Transaction extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
