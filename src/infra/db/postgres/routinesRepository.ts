@@ -1,6 +1,5 @@
 import {
   Between,
-  ILike,
   IsNull,
   Not,
   Repository,
@@ -177,29 +176,37 @@ export class RoutinesRepository implements RoutinesRepositoryProtocol {
     const limit = data.limit || 10;
     const offset = (page - 1) * limit;
     const search = data.search || "";
-    const sortBy = data.sortBy || "type";
+    const allowedSortFields = ["type", "period", "created_at", "updated_at"];
+    const sortBy = allowedSortFields.includes(data.sortBy || "")
+      ? data.sortBy!
+      : "type";
     const order = data.order?.toUpperCase() === "DESC" ? "DESC" : "ASC";
 
-    const whereCondition = search
-      ? { type: ILike(`%${search}%`), user: { id: data.userId } }
-      : { user: { id: data.userId } };
+    const query = this.repository
+      .createQueryBuilder("routine")
+      .leftJoinAndSelect("routine.user", "user")
+      .leftJoinAndSelect("routine.notes", "note")
+      .where("user.id = :userId", { userId: data.userId });
+
+    if (search) {
+      query.andWhere("routine.type ILIKE :search", { search: `%${search}%` });
+    }
 
     if (data.year && data.month) {
       const startDate = new Date(data.year, data.month - 1, 1);
       const endDate = new Date(data.year, data.month, 0, 23, 59, 59, 999);
 
-      Object.assign(whereCondition, {
-        created_at: Between(startDate, endDate),
-      });
+      query.andWhere(
+        "(routine.created_at BETWEEN :startDate AND :endDate OR note.dateOfNote BETWEEN :startDate AND :endDate)",
+        { startDate, endDate }
+      );
     }
 
-    const [routines, total] = await this.repository.findAndCount({
-      where: whereCondition,
-      relations: ["user", "notes"],
-      take: limit,
-      skip: offset,
-      order: { [sortBy]: order },
-    });
+    const [routines, total] = await query
+      .take(limit)
+      .skip(offset)
+      .orderBy(`routine.${sortBy}`, order)
+      .getManyAndCount();
 
     const formattedRoutines = routines.map((routine) => ({
       id: routine.id,
