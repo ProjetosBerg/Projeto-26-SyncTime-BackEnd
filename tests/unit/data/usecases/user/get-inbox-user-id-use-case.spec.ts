@@ -24,6 +24,7 @@ const makeNotesRepository = (): jest.Mocked<NotesRepositoryProtocol> => ({
   deleteNote: jest.fn(),
   findByUserIdAndDate: jest.fn(),
   findByUserIdAndSummaryDate: jest.fn(),
+  findForMyDay: jest.fn(),
 });
 
 const makeCategoryRepository = (): jest.Mocked<CategoryRepositoryProtocol> => ({

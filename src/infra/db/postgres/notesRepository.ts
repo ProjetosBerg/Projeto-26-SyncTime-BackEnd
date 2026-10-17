@@ -6,6 +6,7 @@ import { Routines } from "@/domain/entities/postgres/Routines";
 import { Category } from "@/domain/entities/postgres/Category";
 import { NotesRepositoryProtocol } from "../interfaces/notesRepositoryProtocol";
 import { NotFoundError } from "@/data/errors/NotFoundError";
+import { MyDayItemModel } from "@/domain/models/postgres/MyDayModel";
 
 export class NotesRepository implements NotesRepositoryProtocol {
   private repository: Repository<Notes>;
@@ -302,6 +303,56 @@ export class NotesRepository implements NotesRepositoryProtocol {
       notes: formattedNotes,
       total,
     };
+  }
+
+  async findForMyDay(
+    data: NotesRepositoryProtocol.FindForMyDayParams
+  ): Promise<MyDayItemModel[]> {
+    const startDate = new Date(`${data.date}T00:00:00.000Z`);
+    const endDate = new Date(`${data.date}T23:59:59.999Z`);
+
+    const notes = await this.repository
+      .createQueryBuilder("note")
+      .innerJoinAndSelect("note.routine", "routine")
+      .leftJoinAndSelect("note.category", "category")
+      .innerJoin("note.user", "user")
+      .where("user.id = :userId", { userId: data.userId })
+      .andWhere("note.dateOfNote BETWEEN :startDate AND :endDate", {
+        startDate,
+        endDate,
+      })
+      .andWhere(
+        "(note.activity IS NULL OR note.activity NOT ILIKE :summaryPattern)",
+        { summaryPattern: "Resumo do Dia - %" }
+      )
+      .orderBy("CASE WHEN note.startTime IS NULL THEN 1 ELSE 0 END", "ASC")
+      .addOrderBy("note.startTime", "ASC")
+      .addOrderBy("note.created_at", "ASC")
+      .getMany();
+
+    return notes.map((note) => ({
+      id: note.id,
+      activity: note.activity,
+      activityType: note.activityType,
+      description: note.description,
+      status: note.status,
+      priority: note.priority,
+      collaborators: note.collaborators,
+      startTime: note.startTime,
+      endTime: note.endTime,
+      dateOfNote: note.dateOfNote,
+      routine: {
+        id: note.routine.id,
+        type: note.routine.type,
+        period: note.routine.period,
+      },
+      category: note.category
+        ? {
+            id: note.category.id,
+            name: note.category.name,
+          }
+        : null,
+    }));
   }
 
   /**

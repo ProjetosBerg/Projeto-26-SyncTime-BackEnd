@@ -1,5 +1,6 @@
 import { NotesModel } from "@/domain/models/postgres/NotesModel";
 import { Comment } from "@/domain/models/postgres/NotesModel";
+import { MyDayItemModel } from "@/domain/models/postgres/MyDayModel";
 
 export interface NotesRepositoryProtocol {
   create(data: NotesRepositoryProtocol.CreateNote): Promise<NotesModel>;
@@ -19,6 +20,9 @@ export interface NotesRepositoryProtocol {
   findByUserIdAndSummaryDate(
     data: NotesRepositoryProtocol.FindByUserIdAndSummaryDateParams
   ): Promise<NotesModel | null>;
+  findForMyDay(
+    data: NotesRepositoryProtocol.FindForMyDayParams
+  ): Promise<MyDayItemModel[]>;
 }
 
 export namespace NotesRepositoryProtocol {
@@ -82,5 +86,10 @@ export namespace NotesRepositoryProtocol {
   export type FindByUserIdAndSummaryDateParams = {
     userId: NotesModel["user_id"];
     formattedDate: string;
+  };
+
+  export type FindForMyDayParams = {
+    userId: string;
+    date: string;
   };
 }

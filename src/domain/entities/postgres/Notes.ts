@@ -7,6 +7,7 @@ import {
   BaseEntity,
   ManyToOne,
   JoinColumn,
+  Index,
 } from "typeorm";
 import { User } from "./User";
 import { Category } from "./Category";
@@ -14,6 +15,7 @@ import { Routines } from "./Routines";
 import { Comment } from "@/domain/models/postgres/NotesModel";
 
 @Entity("notes")
+@Index("IDX_notes_user_date_time", ["user", "dateOfNote", "startTime"])
 export class Notes extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
