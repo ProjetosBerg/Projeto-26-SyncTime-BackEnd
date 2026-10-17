@@ -1,4 +1,5 @@
 import { Period } from "./RoutinModel";
+import { RecurrenceFrequency } from "./NotesModel";
 
 export type MyDayItemModel = {
   id: string;
@@ -11,6 +12,11 @@ export type MyDayItemModel = {
   startTime?: string;
   endTime?: string;
   dateOfNote?: Date;
+  recurrenceGroupId?: string;
+  recurrenceFrequency?: RecurrenceFrequency;
+  recurrenceInterval?: number;
+  recurrenceEndDate?: string;
+  recurrenceWeekDays?: number[];
   routine: {
     id: string;
     type: string;

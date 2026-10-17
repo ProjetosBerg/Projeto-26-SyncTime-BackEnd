@@ -19,6 +19,7 @@ const makeNotesRepository = (): jest.Mocked<NotesRepositoryProtocol> => ({
     total: 1,
   }),
   create: jest.fn(),
+  createMany: jest.fn(),
   findByIdAndUserId: jest.fn(),
   updateNote: jest.fn(),
   deleteNote: jest.fn(),

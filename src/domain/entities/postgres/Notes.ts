@@ -13,9 +13,14 @@ import { User } from "./User";
 import { Category } from "./Category";
 import { Routines } from "./Routines";
 import { Comment } from "@/domain/models/postgres/NotesModel";
+import { RecurrenceFrequency } from "@/domain/models/postgres/NotesModel";
 
 @Entity("notes")
 @Index("IDX_notes_user_date_time", ["user", "dateOfNote", "startTime"])
+@Index("IDX_notes_recurrence_group_date", ["recurrenceGroupId", "dateOfNote"], {
+  unique: true,
+  where: '"recurrenceGroupId" IS NOT NULL',
+})
 export class Notes extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -53,6 +58,21 @@ export class Notes extends BaseEntity {
 
   @Column({ type: "timestamp", nullable: true })
   dateOfNote?: Date;
+
+  @Column({ type: "uuid", nullable: true })
+  recurrenceGroupId?: string;
+
+  @Column({ type: "varchar", length: 20, nullable: true })
+  recurrenceFrequency?: RecurrenceFrequency;
+
+  @Column({ type: "integer", nullable: true })
+  recurrenceInterval?: number;
+
+  @Column({ type: "date", nullable: true })
+  recurrenceEndDate?: string;
+
+  @Column({ type: "json", nullable: true })
+  recurrenceWeekDays?: number[];
 
   @Column("json", { nullable: true })
   comments?: Comment[];

@@ -13,6 +13,7 @@ import { NotificationRepositoryProtocol } from "@/infra/db/interfaces/notificati
 export const makeNotesRepository =
   (): jest.Mocked<NotesRepositoryProtocol> => ({
     create: jest.fn().mockResolvedValue(mockNotes),
+    createMany: jest.fn(),
     ...({} as any),
   });
 
@@ -135,6 +136,87 @@ describe("CreateNotesUseCase", () => {
     expect(routinesRepositorySpy.findByIdAndUserId).toHaveBeenCalledTimes(1);
     expect(notesRepositorySpy.create).toHaveBeenCalledWith(input);
     expect(notesRepositorySpy.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("should create all recurring occurrences in one repository call", async () => {
+    const { sut, notesRepositorySpy } = makeSut();
+    notesRepositorySpy.createMany.mockImplementation(async (occurrences) =>
+      occurrences.map((occurrence, index) => ({
+        ...mockNotes,
+        ...occurrence,
+        id: `note-${index + 1}`,
+        user_id: occurrence.userId,
+      }))
+    );
+
+    const input = {
+      status: mockNotes.status,
+      collaborators: mockNotes.collaborators,
+      priority: mockNotes.priority,
+      category_id: mockNotes.category_id,
+      activity: mockNotes.activity,
+      activityType: mockNotes.activityType,
+      description: mockNotes.description,
+      startTime: mockNotes.startTime,
+      endTime: mockNotes.endTime,
+      comments: mockNotes.comments,
+      routine_id: mockNotes.routine_id,
+      userId: mockNotes.user_id,
+      dateOfNote: new Date("2026-10-17T03:00:00.000Z"),
+      recurrence: {
+        frequency: "daily" as const,
+        interval: 2,
+        endDate: "2026-10-21",
+      },
+    };
+
+    const result = await sut.handle(input);
+
+    expect(notesRepositorySpy.create).not.toHaveBeenCalled();
+    expect(notesRepositorySpy.createMany).toHaveBeenCalledTimes(1);
+    expect(notesRepositorySpy.createMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        dateOfNote: new Date("2026-10-17T00:00:00.000Z"),
+        recurrenceGroupId: expect.any(String),
+        recurrenceFrequency: "daily",
+        recurrenceInterval: 2,
+        recurrenceEndDate: "2026-10-21",
+      }),
+      expect.objectContaining({
+        dateOfNote: new Date("2026-10-19T00:00:00.000Z"),
+      }),
+      expect.objectContaining({
+        dateOfNote: new Date("2026-10-21T00:00:00.000Z"),
+      }),
+    ]);
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "note-1",
+        occurrenceCount: 3,
+        recurrenceFrequency: "daily",
+      })
+    );
+  });
+
+  test("should require a note date when recurrence is informed", async () => {
+    const { sut, notesRepositorySpy } = makeSut();
+    const input = {
+      ...mockNotes,
+      userId: mockNotes.user_id,
+      dateOfNote: undefined,
+      recurrence: {
+        frequency: "daily" as const,
+        endDate: "2026-10-21",
+      },
+    } as any;
+
+    await expect(sut.handle(input)).rejects.toMatchObject({
+      errors: expect.arrayContaining([
+        "Data da anotação é obrigatória para recorrência",
+      ]),
+    });
+    expect(notesRepositorySpy.create).not.toHaveBeenCalled();
+    expect(notesRepositorySpy.createMany).not.toHaveBeenCalled();
   });
 
   test("should throw ValidationError if status is empty", async () => {

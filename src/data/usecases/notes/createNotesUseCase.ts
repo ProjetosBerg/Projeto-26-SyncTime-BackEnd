@@ -11,6 +11,8 @@ import { NotificationModel } from "@/domain/models/postgres/NotificationModel";
 
 import { getIo } from "@/lib/socket";
 import logger from "@/loaders/logger";
+import { randomUUID } from "crypto";
+import { generateRecurrenceDates } from "./helpers/generateRecurrenceDates";
 
 /**
  * Cria uma nova Anotação para um usuário
@@ -54,7 +56,7 @@ export class CreateNotesUseCase implements CreateNotesUseCaseProtocol {
         }
       }
 
-      const createdNote = await this.notesRepository.create({
+      const noteData: NotesRepositoryProtocol.CreateNote = {
         status: data.status,
         collaborators: data.collaborators,
         priority: data.priority,
@@ -68,10 +70,43 @@ export class CreateNotesUseCase implements CreateNotesUseCaseProtocol {
         routine_id: data.routine_id,
         userId: data.userId,
         dateOfNote: data.dateOfNote,
-      });
+      };
+
+      let createdNote: NotesModel;
+
+      if (data.recurrence) {
+        const occurrenceDates = generateRecurrenceDates(
+          data.dateOfNote!,
+          data.recurrence
+        );
+        const recurrenceGroupId = randomUUID();
+        const createdNotes = await this.notesRepository.createMany(
+          occurrenceDates.map((dateOfNote) => ({
+            ...noteData,
+            dateOfNote,
+            recurrenceGroupId,
+            recurrenceFrequency: data.recurrence!.frequency,
+            recurrenceInterval: data.recurrence!.interval || 1,
+            recurrenceEndDate: data.recurrence!.endDate,
+            recurrenceWeekDays:
+              data.recurrence!.frequency === "weekly"
+                ? data.recurrence!.weekDays
+                : undefined,
+          }))
+        );
+
+        createdNote = {
+          ...createdNotes[0],
+          occurrenceCount: createdNotes.length,
+        };
+      } else {
+        createdNote = await this.notesRepository.create(noteData);
+      }
 
       const newNotification = await this.notificationRepository.create({
-        title: `Nova anotação criada: ${data.activity}`,
+        title: data.recurrence
+          ? `Nova recorrência criada: ${data.activity}`
+          : `Nova anotação criada: ${data.activity}`,
         entity: "Anotação",
         idEntity: createdNote.id,
         userId: data.userId,

@@ -1,4 +1,7 @@
-import { NotesModel } from "@/domain/models/postgres/NotesModel";
+import {
+  NotesModel,
+  RecurrenceConfig,
+} from "@/domain/models/postgres/NotesModel";
 
 export interface CreateNotesUseCaseProtocol {
   handle(data: CreateNotesUseCaseProtocol.Params): Promise<NotesModel>;
@@ -19,5 +22,6 @@ export namespace CreateNotesUseCaseProtocol {
     routine_id: NotesModel["routine_id"];
     userId: NotesModel["user_id"];
     dateOfNote?: NotesModel["dateOfNote"];
+    recurrence?: RecurrenceConfig;
   };
 }

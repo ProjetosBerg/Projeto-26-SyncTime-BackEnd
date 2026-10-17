@@ -27,6 +27,7 @@ export class CreateNotesController implements Controller {
         comments,
         routine_id,
         dateOfNote,
+        recurrence,
       } = req.body;
 
       const data = {
@@ -42,6 +43,7 @@ export class CreateNotesController implements Controller {
         comments,
         routine_id,
         dateOfNote,
+        recurrence,
       };
 
       const createNote = await this.createNotesService.handle({

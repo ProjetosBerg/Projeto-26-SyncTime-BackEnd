@@ -37,6 +37,11 @@ export class NotesRepository implements NotesRepositoryProtocol {
         category: { id: data.category_id } as Category,
       }),
       dateOfNote: data.dateOfNote,
+      recurrenceGroupId: data.recurrenceGroupId,
+      recurrenceFrequency: data.recurrenceFrequency,
+      recurrenceInterval: data.recurrenceInterval,
+      recurrenceEndDate: data.recurrenceEndDate,
+      recurrenceWeekDays: data.recurrenceWeekDays,
     });
 
     const savedNote = await this.repository.save(note);
@@ -57,7 +62,73 @@ export class NotesRepository implements NotesRepositoryProtocol {
       user_id: savedNote.user.id,
       created_at: savedNote.created_at,
       updated_at: savedNote.updated_at,
+      dateOfNote: savedNote.dateOfNote,
+      recurrenceGroupId: savedNote.recurrenceGroupId,
+      recurrenceFrequency: savedNote.recurrenceFrequency,
+      recurrenceInterval: savedNote.recurrenceInterval,
+      recurrenceEndDate: savedNote.recurrenceEndDate,
+      recurrenceWeekDays: savedNote.recurrenceWeekDays,
     };
+  }
+
+  /** Cria todas as ocorrências da série em uma única transação. */
+  async createMany(
+    data: NotesRepositoryProtocol.CreateNote[]
+  ): Promise<NotesModel[]> {
+    const notes = this.repository.create(
+      data.map((item) => ({
+        status: item.status,
+        collaborators: item.collaborators,
+        priority: item.priority,
+        activity: item.activity,
+        activityType: item.activityType,
+        description: item.description,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        comments: item.comments,
+        summaryDay: item.summaryDay,
+        routine: { id: item.routine_id } as Routines,
+        user: { id: item.userId } as User,
+        ...(item.category_id && {
+          category: { id: item.category_id } as Category,
+        }),
+        dateOfNote: item.dateOfNote,
+        recurrenceGroupId: item.recurrenceGroupId,
+        recurrenceFrequency: item.recurrenceFrequency,
+        recurrenceInterval: item.recurrenceInterval,
+        recurrenceEndDate: item.recurrenceEndDate,
+        recurrenceWeekDays: item.recurrenceWeekDays,
+      }))
+    );
+
+    const savedNotes = await this.repository.save(notes, {
+      transaction: true,
+    });
+
+    return savedNotes.map((note) => ({
+      id: note.id,
+      status: note.status,
+      collaborators: note.collaborators,
+      priority: note.priority,
+      category_id: note.category?.id,
+      activity: note.activity,
+      activityType: note.activityType,
+      description: note.description,
+      startTime: note.startTime,
+      endTime: note.endTime,
+      comments: note.comments,
+      summaryDay: note.summaryDay,
+      routine_id: note.routine.id,
+      user_id: note.user.id,
+      created_at: note.created_at,
+      updated_at: note.updated_at,
+      dateOfNote: note.dateOfNote,
+      recurrenceGroupId: note.recurrenceGroupId,
+      recurrenceFrequency: note.recurrenceFrequency,
+      recurrenceInterval: note.recurrenceInterval,
+      recurrenceEndDate: note.recurrenceEndDate,
+      recurrenceWeekDays: note.recurrenceWeekDays,
+    }));
   }
 
   /**
@@ -98,6 +169,11 @@ export class NotesRepository implements NotesRepositoryProtocol {
       created_at: note.created_at,
       updated_at: note.updated_at,
       dateOfNote: note.dateOfNote,
+      recurrenceGroupId: note.recurrenceGroupId,
+      recurrenceFrequency: note.recurrenceFrequency,
+      recurrenceInterval: note.recurrenceInterval,
+      recurrenceEndDate: note.recurrenceEndDate,
+      recurrenceWeekDays: note.recurrenceWeekDays,
     };
   }
 
@@ -149,6 +225,12 @@ export class NotesRepository implements NotesRepositoryProtocol {
       user_id: note.user.id,
       created_at: note.created_at,
       updated_at: note.updated_at,
+      dateOfNote: note.dateOfNote,
+      recurrenceGroupId: note.recurrenceGroupId,
+      recurrenceFrequency: note.recurrenceFrequency,
+      recurrenceInterval: note.recurrenceInterval,
+      recurrenceEndDate: note.recurrenceEndDate,
+      recurrenceWeekDays: note.recurrenceWeekDays,
     }));
 
     return {
@@ -228,6 +310,12 @@ export class NotesRepository implements NotesRepositoryProtocol {
       user_id: updatedNote.user.id,
       created_at: updatedNote.created_at,
       updated_at: updatedNote.updated_at,
+      dateOfNote: updatedNote.dateOfNote,
+      recurrenceGroupId: updatedNote.recurrenceGroupId,
+      recurrenceFrequency: updatedNote.recurrenceFrequency,
+      recurrenceInterval: updatedNote.recurrenceInterval,
+      recurrenceEndDate: updatedNote.recurrenceEndDate,
+      recurrenceWeekDays: updatedNote.recurrenceWeekDays,
     };
   }
 
@@ -297,6 +385,12 @@ export class NotesRepository implements NotesRepositoryProtocol {
       summaryDay: note.summaryDay,
       created_at: note.created_at,
       updated_at: note.updated_at,
+      dateOfNote: note.dateOfNote,
+      recurrenceGroupId: note.recurrenceGroupId,
+      recurrenceFrequency: note.recurrenceFrequency,
+      recurrenceInterval: note.recurrenceInterval,
+      recurrenceEndDate: note.recurrenceEndDate,
+      recurrenceWeekDays: note.recurrenceWeekDays,
     }));
 
     return {
@@ -341,6 +435,11 @@ export class NotesRepository implements NotesRepositoryProtocol {
       startTime: note.startTime,
       endTime: note.endTime,
       dateOfNote: note.dateOfNote,
+      recurrenceGroupId: note.recurrenceGroupId,
+      recurrenceFrequency: note.recurrenceFrequency,
+      recurrenceInterval: note.recurrenceInterval,
+      recurrenceEndDate: note.recurrenceEndDate,
+      recurrenceWeekDays: note.recurrenceWeekDays,
       routine: {
         id: note.routine.id,
         type: note.routine.type,
@@ -392,6 +491,12 @@ export class NotesRepository implements NotesRepositoryProtocol {
       summaryDay: note.summaryDay,
       created_at: note.created_at,
       updated_at: note.updated_at,
+      dateOfNote: note.dateOfNote,
+      recurrenceGroupId: note.recurrenceGroupId,
+      recurrenceFrequency: note.recurrenceFrequency,
+      recurrenceInterval: note.recurrenceInterval,
+      recurrenceEndDate: note.recurrenceEndDate,
+      recurrenceWeekDays: note.recurrenceWeekDays,
     };
   }
 }

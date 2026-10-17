@@ -9,6 +9,17 @@ export interface Comment {
   updated_at: Date;
 }
 
+export const recurrenceFrequencies = ["daily", "weekly", "monthly"] as const;
+
+export type RecurrenceFrequency = (typeof recurrenceFrequencies)[number];
+
+export type RecurrenceConfig = {
+  frequency: RecurrenceFrequency;
+  interval?: number;
+  endDate: string;
+  weekDays?: number[];
+};
+
 export type NotesModel = {
   id?: string;
   status?: string;
@@ -27,4 +38,10 @@ export type NotesModel = {
   created_at?: Date;
   updated_at?: Date;
   dateOfNote?: Date;
+  recurrenceGroupId?: string;
+  recurrenceFrequency?: RecurrenceFrequency;
+  recurrenceInterval?: number;
+  recurrenceEndDate?: string;
+  recurrenceWeekDays?: number[];
+  occurrenceCount?: number;
 };

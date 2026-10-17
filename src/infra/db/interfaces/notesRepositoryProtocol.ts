@@ -4,6 +4,7 @@ import { MyDayItemModel } from "@/domain/models/postgres/MyDayModel";
 
 export interface NotesRepositoryProtocol {
   create(data: NotesRepositoryProtocol.CreateNote): Promise<NotesModel>;
+  createMany(data: NotesRepositoryProtocol.CreateNote[]): Promise<NotesModel[]>;
   findByIdAndUserId(
     data: NotesRepositoryProtocol.FindByIdAndUserIdParams
   ): Promise<NotesModel | null>;
@@ -41,6 +42,11 @@ export namespace NotesRepositoryProtocol {
     userId: NotesModel["user_id"];
     summaryDay?: NotesModel["summaryDay"];
     dateOfNote?: NotesModel["dateOfNote"];
+    recurrenceGroupId?: NotesModel["recurrenceGroupId"];
+    recurrenceFrequency?: NotesModel["recurrenceFrequency"];
+    recurrenceInterval?: NotesModel["recurrenceInterval"];
+    recurrenceEndDate?: NotesModel["recurrenceEndDate"];
+    recurrenceWeekDays?: NotesModel["recurrenceWeekDays"];
   };
 
   export type FindByIdAndUserIdParams = {
