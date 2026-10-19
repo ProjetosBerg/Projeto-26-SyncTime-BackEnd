@@ -65,4 +65,17 @@ export const editNotesValidationSchema = yup.object().shape({
     .required("ID da Anotação é obrigatório")
     .uuid("ID da Anotação deve ser um UUID válido"),
   userId: yup.string().required("ID do Usuário é obrigatório"),
+  reminderMinutesBefore: yup
+    .number()
+    .integer("Antecedência do lembrete deve ser um número inteiro")
+    .min(0, "Antecedência do lembrete não pode ser negativa")
+    .max(10080, "Lembrete deve ter no máximo sete dias de antecedência")
+    .nullable()
+    .optional(),
+  timezoneOffset: yup
+    .number()
+    .integer("Fuso horário inválido")
+    .min(-840, "Fuso horário inválido")
+    .max(840, "Fuso horário inválido")
+    .optional(),
 });

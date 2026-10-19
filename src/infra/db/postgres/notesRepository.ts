@@ -42,6 +42,10 @@ export class NotesRepository implements NotesRepositoryProtocol {
       recurrenceInterval: data.recurrenceInterval,
       recurrenceEndDate: data.recurrenceEndDate,
       recurrenceWeekDays: data.recurrenceWeekDays,
+      reminderMinutesBefore: data.reminderMinutesBefore,
+      reminderAt: data.reminderAt,
+      reminderSentAt: data.reminderSentAt,
+      reminderTimezoneOffset: data.reminderTimezoneOffset,
     });
 
     const savedNote = await this.repository.save(note);
@@ -68,6 +72,10 @@ export class NotesRepository implements NotesRepositoryProtocol {
       recurrenceInterval: savedNote.recurrenceInterval,
       recurrenceEndDate: savedNote.recurrenceEndDate,
       recurrenceWeekDays: savedNote.recurrenceWeekDays,
+      reminderMinutesBefore: savedNote.reminderMinutesBefore,
+      reminderAt: savedNote.reminderAt,
+      reminderSentAt: savedNote.reminderSentAt,
+      reminderTimezoneOffset: savedNote.reminderTimezoneOffset,
     };
   }
 
@@ -98,6 +106,10 @@ export class NotesRepository implements NotesRepositoryProtocol {
         recurrenceInterval: item.recurrenceInterval,
         recurrenceEndDate: item.recurrenceEndDate,
         recurrenceWeekDays: item.recurrenceWeekDays,
+        reminderMinutesBefore: item.reminderMinutesBefore,
+        reminderAt: item.reminderAt,
+        reminderSentAt: item.reminderSentAt,
+        reminderTimezoneOffset: item.reminderTimezoneOffset,
       }))
     );
 
@@ -128,6 +140,10 @@ export class NotesRepository implements NotesRepositoryProtocol {
       recurrenceInterval: note.recurrenceInterval,
       recurrenceEndDate: note.recurrenceEndDate,
       recurrenceWeekDays: note.recurrenceWeekDays,
+      reminderMinutesBefore: note.reminderMinutesBefore,
+      reminderAt: note.reminderAt,
+      reminderSentAt: note.reminderSentAt,
+      reminderTimezoneOffset: note.reminderTimezoneOffset,
     }));
   }
 
@@ -285,6 +301,13 @@ export class NotesRepository implements NotesRepositoryProtocol {
     if (data.startTime !== undefined) note.startTime = data.startTime;
     if (data.endTime !== undefined) note.endTime = data.endTime;
     if (data.comments !== undefined) note.comments = data.comments;
+    if (data.reminderMinutesBefore !== undefined)
+      note.reminderMinutesBefore = data.reminderMinutesBefore;
+    if (data.reminderAt !== undefined) note.reminderAt = data.reminderAt;
+    if (data.reminderSentAt !== undefined)
+      note.reminderSentAt = data.reminderSentAt;
+    if (data.reminderTimezoneOffset !== undefined)
+      note.reminderTimezoneOffset = data.reminderTimezoneOffset;
     if (data.routine_id !== undefined)
       note.routine = { id: data.routine_id } as Routines;
     if (data.category_id !== undefined)
@@ -316,6 +339,10 @@ export class NotesRepository implements NotesRepositoryProtocol {
       recurrenceInterval: updatedNote.recurrenceInterval,
       recurrenceEndDate: updatedNote.recurrenceEndDate,
       recurrenceWeekDays: updatedNote.recurrenceWeekDays,
+      reminderMinutesBefore: updatedNote.reminderMinutesBefore,
+      reminderAt: updatedNote.reminderAt,
+      reminderSentAt: updatedNote.reminderSentAt,
+      reminderTimezoneOffset: updatedNote.reminderTimezoneOffset,
     };
   }
 

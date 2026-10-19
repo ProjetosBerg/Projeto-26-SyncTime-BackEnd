@@ -44,4 +44,8 @@ export type NotesModel = {
   recurrenceEndDate?: string;
   recurrenceWeekDays?: number[];
   occurrenceCount?: number;
+  reminderMinutesBefore?: number | null;
+  reminderAt?: Date | null;
+  reminderSentAt?: Date | null;
+  reminderTimezoneOffset?: number | null;
 };

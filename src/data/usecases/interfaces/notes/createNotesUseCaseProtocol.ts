@@ -23,5 +23,7 @@ export namespace CreateNotesUseCaseProtocol {
     userId: NotesModel["user_id"];
     dateOfNote?: NotesModel["dateOfNote"];
     recurrence?: RecurrenceConfig;
+    reminderMinutesBefore?: number | null;
+    timezoneOffset?: number;
   };
 }

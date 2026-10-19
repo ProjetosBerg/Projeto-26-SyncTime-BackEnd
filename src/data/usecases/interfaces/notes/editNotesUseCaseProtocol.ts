@@ -20,5 +20,7 @@ export namespace EditNotesUseCaseProtocol {
     routine_id?: NotesModel["routine_id"];
     noteId: NotesModel["id"];
     userId: NotesModel["user_id"];
+    reminderMinutesBefore?: number | null;
+    timezoneOffset?: number;
   };
 }

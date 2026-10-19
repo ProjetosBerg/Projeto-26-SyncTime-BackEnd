@@ -11,6 +11,9 @@ import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "@/config/swagger";
 import cors from "cors";
 import { initSocket, getIoInstance } from "./lib/socket";
+import { ReminderRepository } from "@/infra/db/postgres/reminderRepository";
+import { NotificationRepository } from "@/infra/db/postgres/notificationRepository";
+import { ReminderProcessor } from "@/services/reminderProcessor";
 
 const app = express();
 const server = http.createServer(app);
@@ -96,6 +99,17 @@ const bootstrap = async (): Promise<void> => {
 
   initSocket(io);
   getIoInstance(io);
+
+  const reminderProcessor = new ReminderProcessor(
+    new ReminderRepository(),
+    new NotificationRepository()
+  );
+  await reminderProcessor.processDue();
+  const reminderInterval = setInterval(
+    () => void reminderProcessor.processDue(),
+    60_000
+  );
+  reminderInterval.unref();
 
   server.listen(port, () => {
     logger.info(`Servidor rodando na porta ${port} - Ambiente: ${NODE_ENV} 🚀`);

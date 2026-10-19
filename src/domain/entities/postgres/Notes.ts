@@ -21,6 +21,9 @@ import { RecurrenceFrequency } from "@/domain/models/postgres/NotesModel";
   unique: true,
   where: '"recurrenceGroupId" IS NOT NULL',
 })
+@Index("IDX_notes_pending_reminder", ["reminderAt"], {
+  where: '"reminderAt" IS NOT NULL AND "reminderSentAt" IS NULL',
+})
 export class Notes extends BaseEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -73,6 +76,18 @@ export class Notes extends BaseEntity {
 
   @Column({ type: "json", nullable: true })
   recurrenceWeekDays?: number[];
+
+  @Column({ type: "integer", nullable: true })
+  reminderMinutesBefore?: number | null;
+
+  @Column({ type: "timestamp", nullable: true })
+  reminderAt?: Date | null;
+
+  @Column({ type: "timestamp", nullable: true })
+  reminderSentAt?: Date | null;
+
+  @Column({ type: "integer", nullable: true })
+  reminderTimezoneOffset?: number | null;
 
   @Column("json", { nullable: true })
   comments?: Comment[];

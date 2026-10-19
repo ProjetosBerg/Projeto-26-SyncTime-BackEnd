@@ -27,6 +27,8 @@ export class EditNotesController implements Controller {
         endTime,
         comments,
         routine_id,
+        reminderMinutesBefore,
+        timezoneOffset,
       } = req.body;
 
       const data = {
@@ -41,6 +43,8 @@ export class EditNotesController implements Controller {
         endTime,
         comments,
         routine_id,
+        reminderMinutesBefore,
+        timezoneOffset,
       };
 
       const result = await this.editNotesService.handle({

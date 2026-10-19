@@ -111,6 +111,22 @@ export const createNotesValidationSchema = yup
     userId: yup.string().required("ID do Usuário é obrigatório"),
     dateOfNote: yup.date().typeError("Data da anotação é inválida").nullable(),
     recurrence: recurrenceSchema.nullable(),
+    reminderMinutesBefore: yup
+      .number()
+      .integer("Antecedência do lembrete deve ser um número inteiro")
+      .min(0, "Antecedência do lembrete não pode ser negativa")
+      .max(10080, "Lembrete deve ter no máximo sete dias de antecedência")
+      .nullable()
+      .optional(),
+    timezoneOffset: yup
+      .number()
+      .integer("Fuso horário inválido")
+      .min(-840, "Fuso horário inválido")
+      .max(840, "Fuso horário inválido")
+      .when("reminderMinutesBefore", {
+        is: (value: number | null | undefined) => value != null,
+        then: yup.number().required("Fuso horário é obrigatório para o lembrete"),
+      }),
   })
   .test(
     "recurrence-period",

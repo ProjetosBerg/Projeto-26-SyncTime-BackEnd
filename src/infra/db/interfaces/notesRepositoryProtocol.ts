@@ -47,6 +47,10 @@ export namespace NotesRepositoryProtocol {
     recurrenceInterval?: NotesModel["recurrenceInterval"];
     recurrenceEndDate?: NotesModel["recurrenceEndDate"];
     recurrenceWeekDays?: NotesModel["recurrenceWeekDays"];
+    reminderMinutesBefore?: NotesModel["reminderMinutesBefore"];
+    reminderAt?: NotesModel["reminderAt"];
+    reminderSentAt?: NotesModel["reminderSentAt"];
+    reminderTimezoneOffset?: NotesModel["reminderTimezoneOffset"];
   };
 
   export type FindByIdAndUserIdParams = {
@@ -68,6 +72,10 @@ export namespace NotesRepositoryProtocol {
     routine_id?: NotesModel["routine_id"];
     id: NotesModel["id"];
     userId: NotesModel["user_id"];
+    reminderMinutesBefore?: NotesModel["reminderMinutesBefore"];
+    reminderAt?: NotesModel["reminderAt"];
+    reminderSentAt?: NotesModel["reminderSentAt"];
+    reminderTimezoneOffset?: NotesModel["reminderTimezoneOffset"];
   };
 
   export type FindByUserIdParams = {

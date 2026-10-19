@@ -13,6 +13,7 @@ import { getIo } from "@/lib/socket";
 import logger from "@/loaders/logger";
 import { randomUUID } from "crypto";
 import { generateRecurrenceDates } from "./helpers/generateRecurrenceDates";
+import { calculateReminderAt } from "./helpers/calculateReminderAt";
 
 /**
  * Cria uma nova Anotação para um usuário
@@ -70,6 +71,17 @@ export class CreateNotesUseCase implements CreateNotesUseCaseProtocol {
         routine_id: data.routine_id,
         userId: data.userId,
         dateOfNote: data.dateOfNote,
+        ...(data.reminderMinutesBefore != null && {
+          reminderMinutesBefore: data.reminderMinutesBefore,
+          reminderTimezoneOffset: data.timezoneOffset,
+          reminderAt: calculateReminderAt(
+            data.dateOfNote!,
+            data.startTime!,
+            data.reminderMinutesBefore,
+            data.timezoneOffset!
+          ),
+          reminderSentAt: null,
+        }),
       };
 
       let createdNote: NotesModel;
@@ -84,6 +96,14 @@ export class CreateNotesUseCase implements CreateNotesUseCaseProtocol {
           occurrenceDates.map((dateOfNote) => ({
             ...noteData,
             dateOfNote,
+            ...(data.reminderMinutesBefore != null && {
+              reminderAt: calculateReminderAt(
+                dateOfNote,
+                data.startTime!,
+                data.reminderMinutesBefore,
+                data.timezoneOffset!
+              ),
+            }),
             recurrenceGroupId,
             recurrenceFrequency: data.recurrence!.frequency,
             recurrenceInterval: data.recurrence!.interval || 1,

@@ -28,6 +28,8 @@ export class CreateNotesController implements Controller {
         routine_id,
         dateOfNote,
         recurrence,
+        reminderMinutesBefore,
+        timezoneOffset,
       } = req.body;
 
       const data = {
@@ -44,6 +46,8 @@ export class CreateNotesController implements Controller {
         routine_id,
         dateOfNote,
         recurrence,
+        reminderMinutesBefore,
+        timezoneOffset,
       };
 
       const createNote = await this.createNotesService.handle({

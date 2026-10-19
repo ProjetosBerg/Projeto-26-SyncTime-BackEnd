@@ -12,6 +12,7 @@ import { NotificationModel } from "@/domain/models/postgres/NotificationModel";
 
 import { getIo } from "@/lib/socket";
 import logger from "@/loaders/logger";
+import { calculateReminderAt } from "./helpers/calculateReminderAt";
 
 /**
  * Edita uma Anotação existente para um usuário
@@ -82,6 +83,37 @@ export class EditNotesUseCase implements EditNotesUseCaseProtocol {
         }
       }
 
+      const shouldUpdateReminder =
+        data.reminderMinutesBefore !== undefined ||
+        (data.startTime !== undefined &&
+          existingNote.reminderMinutesBefore != null);
+      const reminderMinutesBefore =
+        data.reminderMinutesBefore !== undefined
+          ? data.reminderMinutesBefore
+          : existingNote.reminderMinutesBefore;
+      const reminderTimezoneOffset =
+        data.timezoneOffset ?? existingNote.reminderTimezoneOffset ?? 0;
+      const reminderUpdate = shouldUpdateReminder
+        ? reminderMinutesBefore == null
+          ? {
+              reminderMinutesBefore: null,
+              reminderAt: null,
+              reminderSentAt: null,
+              reminderTimezoneOffset: null,
+            }
+          : {
+              reminderMinutesBefore,
+              reminderAt: calculateReminderAt(
+                existingNote.dateOfNote!,
+                data.startTime ?? existingNote.startTime!,
+                reminderMinutesBefore,
+                reminderTimezoneOffset
+              ),
+              reminderSentAt: null,
+              reminderTimezoneOffset,
+            }
+        : {};
+
       const updatedNote = await this.notesRepository.updateNote({
         status: data.status,
         collaborators: data.collaborators,
@@ -96,6 +128,7 @@ export class EditNotesUseCase implements EditNotesUseCaseProtocol {
         routine_id: data.routine_id,
         id: data.noteId,
         userId: data.userId,
+        ...reminderUpdate,
       });
 
       const newNotification = await this.notificationRepository.create({
