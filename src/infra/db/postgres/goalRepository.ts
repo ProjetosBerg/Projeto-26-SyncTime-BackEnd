@@ -17,6 +17,15 @@ const toModel = (goal: Goal, userId: string): GoalModel => ({
   updated_at: goal.updated_at,
 });
 
+const toDateOnly = (value: unknown): string => {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
+
 const enrichGoal = (goal: GoalModel, progress = 0): GoalModel => {
   const target = Math.max(goal.targetCount, 1);
   const todayParts = new Intl.DateTimeFormat("en-US", {
@@ -90,8 +99,8 @@ export class GoalRepository implements GoalRepositoryProtocol {
           title: row.title,
           description: row.description,
           targetCount: Number(row.targetCount),
-          startDate: String(row.startDate).slice(0, 10),
-          endDate: String(row.endDate).slice(0, 10),
+          startDate: toDateOnly(row.startDate),
+          endDate: toDateOnly(row.endDate),
           user_id: userId,
           created_at: row.created_at,
           updated_at: row.updated_at,
