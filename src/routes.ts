@@ -15,6 +15,7 @@ import { routesDashboard } from "./presentation/routes/routerDashboard";
 import { makeRefreshTokenControllerFactory } from "./main/factories/controllers/user/refreshTokenControllerFactory";
 import { makeRateLimitMiddleware } from "./presentation/middlewares/rateLimit";
 import { routesMyDay } from "./presentation/routes/routesMyDay";
+import { routesGoals } from "./presentation/routes/routesGoals";
 
 const router = Router();
 const refreshRateLimit = makeRateLimitMiddleware({
@@ -54,4 +55,5 @@ routesNotes(router);
 routesNotification(router);
 routesDashboard(router);
 routesMyDay(router);
+routesGoals(router);
 export default router;

@@ -9,6 +9,7 @@ import { Notes } from "@/domain/entities/postgres/Notes";
 import { Authentication } from "@/domain/entities/postgres/Authentication";
 import { Notification } from "@/domain/entities/postgres/Notification";
 import { UserMonthlyEntryRank } from "./UserMonthlyEntryRank";
+import { Goal } from "./Goal";
 
 export default {
   User,
@@ -22,4 +23,5 @@ export default {
   Authentication,
   Notification,
   UserMonthlyEntryRank,
+  Goal,
 };

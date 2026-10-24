@@ -17,6 +17,7 @@ import { Notes } from "./Notes";
 import { Authentication } from "./Authentication";
 import { Notification } from "./Notification";
 import { UserMonthlyEntryRank } from "./UserMonthlyEntryRank";
+import { Goal } from "./Goal";
 
 @Entity("users")
 export class User extends BaseEntity {
@@ -78,6 +79,9 @@ export class User extends BaseEntity {
 
   @OneToMany(() => UserMonthlyEntryRank, (rank) => rank.user, { cascade: true })
   monthlyEntryRanks!: UserMonthlyEntryRank[];
+
+  @OneToMany(() => Goal, (goal) => goal.user, { cascade: true })
+  goals!: Goal[];
 
   @CreateDateColumn({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   created_at!: Date;
