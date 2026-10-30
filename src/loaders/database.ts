@@ -49,7 +49,7 @@ class DatabaseHelper {
     try {
       const uri = this.mongoDbConfig.url;
       await mongoose.connect(uri, {
-        maxPoolSize: 1000,
+        maxPoolSize: Number(process.env.MONGODB_MAX_POOL_SIZE || 20),
         connectTimeoutMS: 10000,
       });
       this.mongooseConnection = mongoose.connection;

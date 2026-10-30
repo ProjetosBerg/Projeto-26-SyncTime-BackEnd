@@ -198,6 +198,66 @@ describe("CreateNotesUseCase", () => {
     );
   });
 
+  test("should calculate a reminder for every recurring occurrence", async () => {
+    const { sut, notesRepositorySpy } = makeSut();
+    notesRepositorySpy.createMany.mockImplementation(async (occurrences) =>
+      occurrences.map((occurrence, index) => ({
+        ...mockNotes,
+        ...occurrence,
+        id: `note-${index + 1}`,
+        user_id: occurrence.userId,
+      }))
+    );
+
+    await sut.handle({
+      ...mockNotes,
+      userId: mockNotes.user_id,
+      dateOfNote: new Date("2026-10-17T00:00:00.000Z"),
+      reminderMinutesBefore: 15,
+      timezoneOffset: 180,
+      recurrence: {
+        frequency: "daily",
+        interval: 1,
+        endDate: "2026-10-19",
+      },
+    } as any);
+
+    expect(notesRepositorySpy.createMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        dateOfNote: new Date("2026-10-17T00:00:00.000Z"),
+        reminderAt: new Date("2026-10-17T11:45:00.000Z"),
+      }),
+      expect.objectContaining({
+        dateOfNote: new Date("2026-10-18T00:00:00.000Z"),
+        reminderAt: new Date("2026-10-18T11:45:00.000Z"),
+      }),
+      expect.objectContaining({
+        dateOfNote: new Date("2026-10-19T00:00:00.000Z"),
+        reminderAt: new Date("2026-10-19T11:45:00.000Z"),
+      }),
+    ]);
+  });
+
+  test("should reject a note whose end time is not after its start time", async () => {
+    const { sut, notesRepositorySpy, routinesRepositorySpy } = makeSut();
+
+    await expect(
+      sut.handle({
+        ...mockNotes,
+        startTime: "10:00",
+        endTime: "09:00",
+        userId: mockNotes.user_id,
+      } as any)
+    ).rejects.toMatchObject({
+      errors: expect.arrayContaining([
+        "A hora final deve ser posterior à hora inicial",
+      ]),
+    });
+
+    expect(routinesRepositorySpy.findByIdAndUserId).not.toHaveBeenCalled();
+    expect(notesRepositorySpy.create).not.toHaveBeenCalled();
+  });
+
   test("should require a note date when recurrence is informed", async () => {
     const { sut, notesRepositorySpy } = makeSut();
     const input = {

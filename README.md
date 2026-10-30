@@ -43,6 +43,10 @@ O servidor expõe as rotas REST sob o prefixo `/api`, disponibiliza documentaç�
 - Exportação de transações em CSV, XLSX e PDF por stream.
 - Dashboard analítico com agregações para gráficos, histogramas, séries temporais, progresso de metas e campos customizados.
 - Calendário operacional com rotinas e anotações.
+- Consulta consolidada do Meu Dia com resumo de progresso.
+- Recorrência diária, semanal por dias selecionados e mensal.
+- Lembretes persistidos, processados em lotes e emitidos via Socket.IO.
+- Metas de produtividade baseadas em atividades concluídas.
 - Geração automática de resumo do dia a partir das anotações.
 - Notificações persistidas em banco e emitidas em tempo real via Socket.IO.
 - Ranking, streak/ofensiva e presença mensal do usuário.
@@ -125,12 +129,16 @@ DB_NAME=synctime
 
 MONGODB_URL=mongodb://localhost:27017/synctime
 MONGODB_NAME=synctime
+MONGODB_MAX_POOL_SIZE=20
 
 CLOUDINARY_CLOUD_NAME=seu_cloud_name
 CLOUDINARY_API_KEY=sua_api_key
 CLOUDINARY_API_SECRET=seu_api_secret
 
 JWT_SECRET=sua_chave_jwt
+REFRESH_TOKEN_TTL_DAYS=7
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+SWAGGER_ENABLED=false
 UPLOAD_TEMP_DIR=uploads/temp
 ```
 
@@ -329,6 +337,16 @@ Todas as rotas REST ficam sob o prefixo `/api`.
 | POST | `/notes/create/summary-day` | Sim | Gera resumo do dia |
 | PATCH | `/notes/edit/:id` | Sim | Edita anotação |
 | DELETE | `/notes/delete/:id` | Sim | Remove anotação |
+| GET | `/my-day` | Sim | Retorna agenda e resumo diário |
+
+### Metas
+
+| Método | Rota | Protegida | Descrição |
+| --- | --- | --- | --- |
+| GET | `/goals` | Sim | Lista metas e progresso do usuário |
+| POST | `/goals` | Sim | Cria uma meta |
+| PATCH | `/goals/:id` | Sim | Atualiza uma meta |
+| DELETE | `/goals/:id` | Sim | Remove uma meta |
 
 ### Notificações e dashboard
 
@@ -359,6 +377,7 @@ Entidades relacionais principais:
 - `notes`
 - `notifications`
 - `user_monthly_entry_rank`
+- `goals`
 
 As migrations ficam em `src/migrations` e são executadas pelo TypeORM.
 
@@ -436,6 +455,8 @@ Em produção, configure:
 - credenciais do Cloudinary
 - `JWT_SECRET` forte
 - CORS compatível com o domínio do front-end
+
+Consulte [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) antes de publicar.
 
 ## Observações importantes
 

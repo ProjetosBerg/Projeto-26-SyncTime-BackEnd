@@ -13,5 +13,5 @@ export const AppDataSource = new DataSource({
   entities: [...Object.values(PostgresEntities)],
   migrations: ["src/migrations/**/*.ts"],
   synchronize: false,
-  logging: true,
+  logging: process.env.NODE_ENV !== "production",
 });

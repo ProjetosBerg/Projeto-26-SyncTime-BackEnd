@@ -1,81 +1,96 @@
 import * as yup from "yup";
 
-export const editNotesValidationSchema = yup.object().shape({
-  status: yup
-    .string()
-    .max(50, "Status deve ter no máximo 50 caracteres")
-    .nullable(),
-  collaborators: yup
-    .array()
-    .of(yup.string())
-    .max(10, "Máximo de 10 colaboradores")
-    .nullable(),
-  priority: yup
-    .string()
-    .max(50, "Prioridade deve ter no máximo 50 caracteres")
-    .nullable(),
-  category_id: yup
-    .string()
-    .uuid("ID da categoria deve ser um UUID válido")
-    .nullable(),
-  activity: yup
-    .string()
-    .min(2, "Atividade deve ter no mínimo 2 caracteres")
-    .max(255, "Atividade deve ter no máximo 255 caracteres")
-    .nullable(),
-  activityType: yup
-    .string()
-    .max(100, "Tipo de atividade deve ter no máximo 100 caracteres")
-    .nullable(),
-  description: yup
-    .string()
-    .min(10, "Descrição deve ter no mínimo 10 caracteres")
-    .nullable(),
-  startTime: yup
-    .string()
-    .matches(
-      /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
-      "Formato de hora inválido (HH:MM)"
-    )
-    .nullable(),
-  endTime: yup
-    .string()
-    .matches(
-      /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
-      "Formato de hora inválido (HH:MM)"
-    )
-    .nullable(),
-  comments: yup
-    .array()
-    .of(
-      yup.object().shape({
-        author: yup.string().required(),
-        text: yup.string().required(),
-        created_at: yup.date().required(),
-        updated_at: yup.date().required(),
-      })
-    )
-    .nullable(),
-  routine_id: yup
-    .string()
-    .uuid("ID da rotina deve ser um UUID válido")
-    .nullable(),
-  noteId: yup
-    .string()
-    .required("ID da Anotação é obrigatório")
-    .uuid("ID da Anotação deve ser um UUID válido"),
-  userId: yup.string().required("ID do Usuário é obrigatório"),
-  reminderMinutesBefore: yup
-    .number()
-    .integer("Antecedência do lembrete deve ser um número inteiro")
-    .min(0, "Antecedência do lembrete não pode ser negativa")
-    .max(10080, "Lembrete deve ter no máximo sete dias de antecedência")
-    .nullable()
-    .optional(),
-  timezoneOffset: yup
-    .number()
-    .integer("Fuso horário inválido")
-    .min(-840, "Fuso horário inválido")
-    .max(840, "Fuso horário inválido")
-    .optional(),
-});
+const timeInMinutes = (value: string): number => {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+export const editNotesValidationSchema = yup
+  .object()
+  .shape({
+    status: yup
+      .string()
+      .max(50, "Status deve ter no máximo 50 caracteres")
+      .nullable(),
+    collaborators: yup
+      .array()
+      .of(yup.string())
+      .max(10, "Máximo de 10 colaboradores")
+      .nullable(),
+    priority: yup
+      .string()
+      .max(50, "Prioridade deve ter no máximo 50 caracteres")
+      .nullable(),
+    category_id: yup
+      .string()
+      .uuid("ID da categoria deve ser um UUID válido")
+      .nullable(),
+    activity: yup
+      .string()
+      .min(2, "Atividade deve ter no mínimo 2 caracteres")
+      .max(255, "Atividade deve ter no máximo 255 caracteres")
+      .nullable(),
+    activityType: yup
+      .string()
+      .max(100, "Tipo de atividade deve ter no máximo 100 caracteres")
+      .nullable(),
+    description: yup
+      .string()
+      .min(10, "Descrição deve ter no mínimo 10 caracteres")
+      .nullable(),
+    startTime: yup
+      .string()
+      .matches(
+        /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+        "Formato de hora inválido (HH:MM)"
+      )
+      .nullable(),
+    endTime: yup
+      .string()
+      .matches(
+        /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+        "Formato de hora inválido (HH:MM)"
+      )
+      .nullable(),
+    comments: yup
+      .array()
+      .of(
+        yup.object().shape({
+          author: yup.string().required(),
+          text: yup.string().required(),
+          created_at: yup.date().required(),
+          updated_at: yup.date().required(),
+        })
+      )
+      .nullable(),
+    routine_id: yup
+      .string()
+      .uuid("ID da rotina deve ser um UUID válido")
+      .nullable(),
+    noteId: yup
+      .string()
+      .required("ID da Anotação é obrigatório")
+      .uuid("ID da Anotação deve ser um UUID válido"),
+    userId: yup.string().required("ID do Usuário é obrigatório"),
+    reminderMinutesBefore: yup
+      .number()
+      .integer("Antecedência do lembrete deve ser um número inteiro")
+      .min(0, "Antecedência do lembrete não pode ser negativa")
+      .max(10080, "Lembrete deve ter no máximo sete dias de antecedência")
+      .nullable()
+      .optional(),
+    timezoneOffset: yup
+      .number()
+      .integer("Fuso horário inválido")
+      .min(-840, "Fuso horário inválido")
+      .max(840, "Fuso horário inválido")
+      .optional(),
+  })
+  .test(
+    "time-range",
+    "A hora final deve ser posterior à hora inicial",
+    (data) =>
+      !data?.startTime ||
+      !data?.endTime ||
+      timeInMinutes(data.endTime) > timeInMinutes(data.startTime)
+  );

@@ -20,17 +20,27 @@ const server = http.createServer(app);
 dotenv.config();
 
 const port = env.get("PORT").required().asPortNumber();
-const NODE_ENV = env.get("NODE_ENV").default("development").asString();
+const NODE_ENV = env
+  .get("NODE_ENV")
+  .default("development")
+  .asEnum(["development", "test", "production"]);
 const jwtSecret = env.get("JWT_SECRET").required().asString().trim();
-// if (NODE_ENV === "production" && jwtSecret.length < 32) {
-//   throw new Error("JWT_SECRET deve ter pelo menos 32 caracteres em produção");
-// }
+if (NODE_ENV === "production" && jwtSecret.length < 32) {
+  throw new Error("JWT_SECRET deve ter pelo menos 32 caracteres em produção");
+}
 const refreshTokenTtlDays = env
   .get("REFRESH_TOKEN_TTL_DAYS")
   .default("7")
   .asIntPositive();
 if (refreshTokenTtlDays > 30) {
   throw new Error("REFRESH_TOKEN_TTL_DAYS deve estar entre 1 e 30");
+}
+const mongodbMaxPoolSize = env
+  .get("MONGODB_MAX_POOL_SIZE")
+  .default("20")
+  .asIntPositive();
+if (mongodbMaxPoolSize > 100) {
+  throw new Error("MONGODB_MAX_POOL_SIZE deve estar entre 1 e 100");
 }
 const configuredOrigins = env
   .get("CORS_ALLOWED_ORIGINS")

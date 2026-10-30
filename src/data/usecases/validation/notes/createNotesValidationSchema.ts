@@ -7,6 +7,11 @@ import { parseDateOnly } from "../../notes/helpers/generateRecurrenceDates";
 
 const MAX_RECURRENCE_HORIZON_DAYS = 730;
 
+const timeInMinutes = (value: string): number => {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
 const recurrenceSchema = yup
   .object()
   .shape({
@@ -125,9 +130,19 @@ export const createNotesValidationSchema = yup
       .max(840, "Fuso horário inválido")
       .when("reminderMinutesBefore", {
         is: (value: number | null | undefined) => value != null,
-        then: yup.number().required("Fuso horário é obrigatório para o lembrete"),
+        then: yup
+          .number()
+          .required("Fuso horário é obrigatório para o lembrete"),
       }),
   })
+  .test(
+    "time-range",
+    "A hora final deve ser posterior à hora inicial",
+    (data) =>
+      !data?.startTime ||
+      !data?.endTime ||
+      timeInMinutes(data.endTime) > timeInMinutes(data.startTime)
+  )
   .test(
     "recurrence-period",
     "Período de recorrência inválido",
