@@ -4,6 +4,9 @@ import { ReminderRepositoryProtocol } from "@/infra/db/interfaces/reminderReposi
 import { getIo } from "@/lib/socket";
 import logger from "@/loaders/logger";
 
+const REMINDER_BATCH_SIZE = 100;
+const MAX_REMINDER_BATCHES_PER_RUN = 10;
+
 export class ReminderProcessor {
   private processing = false;
 
@@ -17,47 +20,60 @@ export class ReminderProcessor {
     this.processing = true;
 
     try {
-      const reminders = await this.reminderRepository.findDue(new Date(), 100);
+      let processedBatches = 0;
 
-      for (const reminder of reminders) {
-        try {
-          const startTime = reminder.startTime?.slice(0, 5) || "horário definido";
-          const notification = await this.notificationRepository.create({
-            title: `Lembrete: ${reminder.activity} começa às ${startTime}`,
-            entity: "Anotação",
-            idEntity: reminder.id,
-            userId: reminder.user_id,
-            path: "/anotacoes",
-            typeOfAction: "Lembrete",
-            payload: {
-              dateOfNote: reminder.dateOfNote,
-              routine_id: reminder.routine_id,
-              startTime: reminder.startTime,
-            } as NotificationModel["payload"],
-          });
+      while (processedBatches < MAX_REMINDER_BATCHES_PER_RUN) {
+        const reminders = await this.reminderRepository.findDue(
+          new Date(),
+          REMINDER_BATCH_SIZE
+        );
 
-          await this.reminderRepository.markAsSent(reminder.id, new Date());
-          const countNewNotification =
-            await this.notificationRepository.countNewByUserId({
+        if (reminders.length === 0) break;
+        processedBatches += 1;
+
+        for (const reminder of reminders) {
+          try {
+            const startTime =
+              reminder.startTime?.slice(0, 5) || "horário definido";
+            const notification = await this.notificationRepository.create({
+              title: `Lembrete: ${reminder.activity} começa às ${startTime}`,
+              entity: "Anotação",
+              idEntity: reminder.id,
               userId: reminder.user_id,
+              path: "/anotacoes",
+              typeOfAction: "Lembrete",
+              payload: {
+                dateOfNote: reminder.dateOfNote,
+                routine_id: reminder.routine_id,
+                startTime: reminder.startTime,
+              } as NotificationModel["payload"],
             });
 
-          getIo()?.to(`user_${reminder.user_id}`).emit("newNotification", {
-            id: notification.id,
-            title: notification.title,
-            entity: notification.entity,
-            idEntity: notification.idEntity,
-            path: notification.path,
-            typeOfAction: notification.typeOfAction,
-            payload: notification.payload,
-            createdAt: notification.created_at,
-            countNewNotification,
-          });
-        } catch (error) {
-          logger.error(
-            `Falha ao processar lembrete ${reminder.id}: ${String(error)}`
-          );
+            await this.reminderRepository.markAsSent(reminder.id, new Date());
+            const countNewNotification =
+              await this.notificationRepository.countNewByUserId({
+                userId: reminder.user_id,
+              });
+
+            getIo()?.to(`user_${reminder.user_id}`).emit("newNotification", {
+              id: notification.id,
+              title: notification.title,
+              entity: notification.entity,
+              idEntity: notification.idEntity,
+              path: notification.path,
+              typeOfAction: notification.typeOfAction,
+              payload: notification.payload,
+              createdAt: notification.created_at,
+              countNewNotification,
+            });
+          } catch (error) {
+            logger.error(
+              `Falha ao processar lembrete ${reminder.id}: ${String(error)}`
+            );
+          }
         }
+
+        if (reminders.length < REMINDER_BATCH_SIZE) break;
       }
     } catch (error) {
       logger.error(`Falha ao buscar lembretes pendentes: ${String(error)}`);
