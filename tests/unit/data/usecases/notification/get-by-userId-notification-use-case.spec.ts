@@ -117,6 +117,20 @@ describe("GetByUserIdNotificationUseCase", () => {
     expect(notificationRepositorySpy.findByUserId).not.toHaveBeenCalled();
   });
 
+  test("should reject notification queries above the maximum page size", async () => {
+    const { sut, notificationRepositorySpy } = makeSut();
+
+    await expect(
+      sut.handle({
+        userId: mockNotification.user_id,
+        page: 1,
+        limit: 101,
+      })
+    ).rejects.toThrow(ValidationError);
+
+    expect(notificationRepositorySpy.findByUserId).not.toHaveBeenCalled();
+  });
+
   test("should throw ValidationError if search is too long", async () => {
     const { sut, notificationRepositorySpy } = makeSut();
     const longSearch = "a".repeat(101);

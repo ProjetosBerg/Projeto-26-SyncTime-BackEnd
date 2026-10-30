@@ -24,14 +24,13 @@ export class GetByUserIdNotificationController implements Controller {
         order,
         isRead,
         typeOfAction,
-        isListAll = false,
       } = req.query;
 
       const { notifications: result, total } =
         await this.getByUserIdNotificationService.handle({
           userId: req.user!.id,
-          page: isListAll ? 1 : Number(page),
-          limit: isListAll ? 1000000000000 : Number(limit),
+          page: Number(page),
+          limit: Number(limit),
           search: String(search),
           sortBy: sortBy as any,
           order: String(order || "ASC"),
